@@ -126,20 +126,4 @@ export async function criarNota(entrada: NotaEntrada): Promise<NotaRegisto> {
   throw new Error("Não foi possível atribuir um número à nota.");
 }
 
-export async function atualizarNota(id: string, entrada: NotaEntrada): Promise<NotaRegisto | null> {
-  const db = await getDb();
-  await db.query(
-    `UPDATE saidas SET
-       beneficiario = $2, origem = $3, periodo = $4, itens = $5::jsonb, total = $6::numeric,
-       cidade = $7, data = $8::date, atualizada_em = now()
-     WHERE id = $1`,
-    [id, ...parametros(entrada)],
-  );
-  return obterNota(id);
-}
-
-export async function eliminarNota(id: string): Promise<boolean> {
-  const db = await getDb();
-  const rows = await db.query<{ id: string }>(`DELETE FROM saidas WHERE id = $1 RETURNING id`, [id]);
-  return rows.length > 0;
-}
+// Nota: as notas registadas são imutáveis — não existem operações de atualização nem eliminação.

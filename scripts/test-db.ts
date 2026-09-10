@@ -27,8 +27,7 @@ const base = (extra: Partial<NotaEntrada>): NotaEntrada => ({
 });
 
 async function main() {
-  const { criarNota, listarNotas, obterNota, atualizarNota, eliminarNota, proximoNumero, NUMERO_INICIAL } =
-    await import("../src/lib/db/notas");
+  const { criarNota, listarNotas, obterNota, proximoNumero, NUMERO_INICIAL } = await import("../src/lib/db/notas");
 
   const assert = (cond: unknown, msg: string) => {
     if (!cond) throw new Error(`FALHOU: ${msg}`);
@@ -60,15 +59,9 @@ async function main() {
   assert((await listarNotas({ q: "cartão" })).length === 1, "pesquisa por origem");
   assert((await listarNotas({ q: "portagem" })).length === 3, "pesquisa por descrição de item");
 
-  const atualizada = await atualizarNota(a.id, base({ beneficiario: "Isaac Gonçalves", itens: [{ descricao: "Cabo", qtd: "", valor: 2500 }] }));
-  assert(atualizada?.beneficiario === "Isaac Gonçalves" && atualizada.numero === a.numero, "atualizar mantém o número");
-  assert(atualizada?.total === 2500, "atualizar recalcula o total");
-  assert((await obterNota(a.id))?.beneficiario === "Isaac Gonçalves", "obter por id");
-
-  assert(await eliminarNota(b.id), "eliminar");
-  assert((await obterNota(b.id)) === null, "nota eliminada não existe");
-  assert((await eliminarNota("inexistente")) === false, "eliminar inexistente devolve false");
-  assert((await proximoNumero()) === Math.max(c1.numero, c2.numero) + 1, "próximo número após eliminação continua a sequência");
+  assert((await obterNota(a.id))?.beneficiario === "Isaac", "obter por id");
+  assert((await obterNota("inexistente")) === null, "obter inexistente devolve null");
+  assert((await proximoNumero()) === Math.max(c1.numero, c2.numero) + 1, "próximo número continua a sequência");
 
   console.log("\nTodos os testes passaram.");
 }

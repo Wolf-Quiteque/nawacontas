@@ -18,7 +18,8 @@ exatamente o mesmo layout.
   **valor por extenso** (português, kwanzas) calculados automaticamente.
 - **Histórico** com pesquisa (beneficiário, origem, item ou número), intervalo de datas e atalhos
   (hoje, mês atual, mês passado, ano). Mostra o total das notas filtradas.
-- **Reimprimir / descarregar / partilhar** qualquer nota antiga; **editar** mantendo o número; eliminar.
+- **Reimprimir / descarregar / partilhar** qualquer nota antiga. As notas registadas são **imutáveis**: não podem ser editadas nem eliminadas.
+- Depois de registar (PDF, partilha ou impressão) a app abre automaticamente uma nova nota.
 - Data de hoje preenchida automaticamente (pode ser alterada); o ano no número segue a data.
 - Rascunho da nota nova guardado automaticamente no dispositivo.
 - PWA instalável (iPhone, Android, computador) com menu lateral / gaveta e ajuda de instalação.
@@ -83,11 +84,11 @@ ser necessário recarregar a página uma vez.
 | `src/lib/extenso.ts` | Números por extenso em português |
 | `src/lib/nota.ts` | Tipos, formatação de valores e datas, textos do documento |
 | `src/lib/db/index.ts` | Ligação à base de dados (Postgres ou PGlite), esquema e migração |
-| `src/lib/db/notas.ts` | Operações sobre as notas (listar, criar com número sequencial, editar, eliminar) |
+| `src/lib/db/notas.ts` | Operações sobre as notas (listar, obter, criar com número sequencial) |
 | `src/lib/validacao.ts` | Validação dos dados recebidos pela API |
 | `src/lib/pwa.ts` | Estado da instalação (evento de instalação, service worker) |
-| `src/app/api/notas/*` | API REST (`GET/POST /api/notas`, `GET/PUT/DELETE /api/notas/[id]`, `GET /api/notas/proximo`) |
-| `src/app/` | Páginas: nova nota (`/`), histórico (`/historico`), ver (`/notas/[id]`), editar (`/notas/[id]/editar`) |
+| `src/app/api/notas/*` | API REST (`GET/POST /api/notas`, `GET /api/notas/[id]`, `GET /api/notas/proximo`) |
+| `src/app/` | Páginas: nova nota (`/`), histórico (`/historico`), ver/reimprimir (`/notas/[id]`) |
 | `src/components/` | Menu lateral, formulário com itens, pré-visualização SVG, histórico, instalação da PWA |
 | `public/sw.js` | Service worker |
 | `scripts/` | Geração de ícones, verificação da base de dados e testes |

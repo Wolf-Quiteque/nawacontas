@@ -57,19 +57,6 @@ export async function apiCriar(entrada: NotaEntrada): Promise<NotaRegisto> {
   return (await pedir<{ nota: NotaRegisto }>("/api/notas", { method: "POST", body: JSON.stringify(entrada) })).nota;
 }
 
-export async function apiAtualizar(id: string, entrada: NotaEntrada): Promise<NotaRegisto> {
-  return (
-    await pedir<{ nota: NotaRegisto }>(`/api/notas/${encodeURIComponent(id)}`, {
-      method: "PUT",
-      body: JSON.stringify(entrada),
-    })
-  ).nota;
-}
-
-export async function apiEliminar(id: string): Promise<void> {
-  await pedir(`/api/notas/${encodeURIComponent(id)}`, { method: "DELETE" });
-}
-
 export async function apiProximoNumero(): Promise<number> {
   return (await pedir<{ numero: number }>("/api/notas/proximo")).numero;
 }

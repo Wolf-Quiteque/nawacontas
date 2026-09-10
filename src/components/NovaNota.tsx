@@ -3,31 +3,49 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
-import { IconeAviso, IconeDescarregar, IconeImprimir, IconeMais, IconePartilhar, IconeVerificado } from "./Icones";
+import { IconeAviso, IconeDescarregar, IconeImprimir, IconePartilhar, IconeVerificado } from "./Icones";
 import { type Formulario, NotaForm, paraEntrada, paraFormulario } from "./NotaForm";
 import { NotaSvg, useLayoutNota } from "./NotaPreview";
 import { descarregarPdf, partilharPdf, suportaPartilha } from "@/lib/acoes";
-import { apiAtualizar, apiCriar, apiProximoNumero } from "@/lib/api";
+import { apiCriar, apiProximoNumero } from "@/lib/api";
 import { guardarRascunho, lerRascunho, limparRascunho } from "@/lib/armazenamento";
-import { anoDaData, notaPadrao, type NotaData, type NotaRegisto, registoParaNota } from "@/lib/nota";
+import { anoDaData, formatarKz, notaPadrao, type NotaData, type NotaRegisto, registoParaNota, totalDaNota } from "@/lib/nota";
 
-interface Props {
-  /** Nota existente a editar; ausente para criar uma nova. */
-  inicial?: NotaRegisto;
+type Acao = "pdf" | "partilhar" | "imprimir";
+type Aviso = { tipo: "ok" | "erro"; texto: string; ligacao?: { href: string; rotulo: string } };
+
+const ROTULO_ACAO: Record<Acao, string> = {
+  pdf: "Registar e gerar PDF",
+  partilhar: "Registar e partilhar",
+  imprimir: "Registar e imprimir",
+};
+
+/** Espera o fecho do diálogo de impressão (afterprint) ou, no máximo, 1,5 s. */
+function aguardarImpressao(): Promise<void> {
+  return new Promise((resolve) => {
+    let feito = false;
+    const concluir = () => {
+      if (feito) return;
+      feito = true;
+      window.removeEventListener("afterprint", concluir);
+      resolve();
+    };
+    window.addEventListener("afterprint", concluir);
+    window.setTimeout(concluir, 1500);
+  });
 }
 
-type Aviso = { tipo: "ok" | "erro"; texto: string };
-
-export function NovaNota({ inicial }: Props) {
+export function NovaNota() {
   const [form, setForm] = useState<Formulario | null>(null);
-  const [registo, setRegisto] = useState<NotaRegisto | null>(inicial ?? null);
   const [proximo, setProximo] = useState<number | null>(null);
   const [erroProximo, setErroProximo] = useState<string | null>(null);
-  const [ocupado, setOcupado] = useState<null | "pdf" | "partilhar" | "imprimir" | "guardar">(null);
+  /** Número definitivo atribuído pelo servidor, enquanto a ação (PDF/impressão) decorre. */
+  const [numeroFixo, setNumeroFixo] = useState<number | null>(null);
+  const [ocupado, setOcupado] = useState<Acao | null>(null);
+  const [confirmar, setConfirmar] = useState<Acao | null>(null);
   const [podePartilhar, setPodePartilhar] = useState(false);
   const [aviso, setAviso] = useState<Aviso | null>(null);
   const avisoTimer = useRef<number | null>(null);
-  const [sujo, setSujo] = useState(false);
 
   const carregarProximo = useCallback(async () => {
     setErroProximo(null);
@@ -41,86 +59,89 @@ export function NovaNota({ inicial }: Props) {
   // Estado inicial apenas no cliente (rascunho, data de hoje, próximo número).
   useEffect(() => {
     /* eslint-disable react-hooks/set-state-in-effect */
-    if (inicial) {
-      setForm(paraFormulario(registoParaNota(inicial)));
-    } else {
-      const rascunho = lerRascunho();
-      setForm(paraFormulario(rascunho ?? notaPadrao()));
-      void carregarProximo();
-    }
+    const rascunho = lerRascunho();
+    setForm(paraFormulario(rascunho ?? notaPadrao()));
     setPodePartilhar(suportaPartilha());
     /* eslint-enable react-hooks/set-state-in-effect */
-  }, [inicial, carregarProximo]);
+    void carregarProximo();
+  }, [carregarProximo]);
 
-  // Rascunho automático (só para notas novas ainda não guardadas).
+  // Rascunho automático da nota em preenchimento.
   useEffect(() => {
-    if (form && !registo) guardarRascunho(paraEntrada(form));
-  }, [form, registo]);
+    if (form && numeroFixo === null) guardarRascunho(paraEntrada(form));
+  }, [form, numeroFixo]);
 
-  const numero = registo ? String(registo.numero) : proximo !== null ? String(proximo) : "";
+  const numero = numeroFixo !== null ? String(numeroFixo) : proximo !== null ? String(proximo) : "";
   const nota: NotaData = useMemo(() => ({ ...(form ? paraEntrada(form) : notaPadrao()), numero }), [form, numero]);
   const primitivas = useLayoutNota(nota);
+  const total = totalDaNota(nota);
 
   const mostrarAviso = useCallback((a: Aviso) => {
     setAviso(a);
     if (avisoTimer.current) window.clearTimeout(avisoTimer.current);
-    avisoTimer.current = window.setTimeout(() => setAviso(null), a.tipo === "erro" ? 5000 : 2800);
+    avisoTimer.current = window.setTimeout(() => setAviso(null), a.tipo === "erro" ? 6000 : 8000);
   }, []);
 
-  const alterar = (f: Formulario) => {
-    setForm(f);
-    setSujo(true);
+  /** Validação rápida antes de pedir confirmação. */
+  const problema = (): string | null => {
+    if (!form) return "Formulário não carregado.";
+    if (!form.beneficiario.trim()) return "Indique o beneficiário (quem recebe o dinheiro).";
+    const itens = form.itens.filter((i) => i.descricao.trim() || i.valor.trim());
+    if (itens.length === 0) return "Adicione pelo menos um item.";
+    if (itens.some((i) => !i.descricao.trim())) return "Todos os itens precisam de descrição.";
+    if (total <= 0) return "O total da saída tem de ser superior a zero.";
+    return null;
   };
 
-  /** Guarda na base de dados (cria ou atualiza) e devolve o registo com o número definitivo. */
-  const guardar = async (): Promise<NotaRegisto> => {
-    if (!form) throw new Error("Formulário não carregado.");
-    const entrada = paraEntrada(form);
-    const guardada = registo && !sujo ? registo : registo ? await apiAtualizar(registo.id, entrada) : await apiCriar(entrada);
-    flushSync(() => {
-      setRegisto(guardada);
-      setForm(paraFormulario(guardada));
-      setSujo(false);
-    });
-    if (!registo) limparRascunho();
-    return guardada;
+  const pedirConfirmacao = (acao: Acao) => {
+    if (ocupado) return;
+    const p = problema();
+    if (p) {
+      mostrarAviso({ tipo: "erro", texto: p });
+      return;
+    }
+    setConfirmar(acao);
   };
 
-  const executar = async (acao: "pdf" | "partilhar" | "imprimir" | "guardar") => {
-    if (ocupado || !form) return;
+  /** Regista a nota, executa a ação escolhida e abre automaticamente uma nova nota. */
+  const registar = async (acao: Acao) => {
+    if (!form || ocupado) return;
+    setConfirmar(null);
     setOcupado(acao);
+    let registada: NotaRegisto | null = null;
     try {
-      const era = registo;
-      const guardada = await guardar();
-      const dados = registoParaNota(guardada);
-      const msg = era ? `Nota N.º ${guardada.numero} atualizada.` : `Nota N.º ${guardada.numero} registada.`;
-      if (acao === "pdf") {
-        await descarregarPdf(dados);
-        mostrarAviso({ tipo: "ok", texto: `${msg} PDF gerado.` });
-      } else if (acao === "partilhar") {
-        const feito = await partilharPdf(dados);
-        mostrarAviso({ tipo: "ok", texto: feito ? `${msg} PDF partilhado.` : msg });
-      } else if (acao === "imprimir") {
-        mostrarAviso({ tipo: "ok", texto: msg });
+      registada = await apiCriar(paraEntrada(form));
+      // Garante que a pré-visualização/impressão usa o número definitivo antes de agir.
+      flushSync(() => setNumeroFixo(registada!.numero));
+      const dados = registoParaNota(registada);
+      if (acao === "pdf") await descarregarPdf(dados);
+      else if (acao === "partilhar") await partilharPdf(dados);
+      else {
         window.print();
-      } else {
-        mostrarAviso({ tipo: "ok", texto: msg });
+        await aguardarImpressao();
       }
     } catch (e) {
-      mostrarAviso({ tipo: "erro", texto: e instanceof Error ? e.message : "Ocorreu um erro." });
-    } finally {
-      setOcupado(null);
+      if (!registada) {
+        mostrarAviso({ tipo: "erro", texto: e instanceof Error ? e.message : "Não foi possível registar a nota." });
+        setOcupado(null);
+        return;
+      }
+      // A nota ficou registada mas a ação falhou (ex.: partilha cancelada): continua para a nova nota.
     }
-  };
 
-  const novaNota = () => {
-    const base = notaPadrao();
-    setForm(paraFormulario({ ...base, cidade: form?.cidade || base.cidade }));
-    setRegisto(null);
-    setSujo(false);
+    // Nova nota automática.
     limparRascunho();
+    const base = notaPadrao();
+    setForm(paraFormulario({ ...base, cidade: form.cidade || base.cidade, origem: form.origem }));
+    setNumeroFixo(null);
+    setOcupado(null);
     void carregarProximo();
     window.scrollTo({ top: 0, behavior: "smooth" });
+    mostrarAviso({
+      tipo: "ok",
+      texto: `Nota N.º ${registada.numero} registada. Nova nota pronta.`,
+      ligacao: { href: `/notas/${registada.id}`, rotulo: "Ver" },
+    });
   };
 
   const ano = anoDaData(nota.data);
@@ -132,9 +153,7 @@ export function NovaNota({ inicial }: Props) {
           {numero ? `N.º ${numero} / ${ano}` : erroProximo ? "—" : "a obter…"}
         </span>
       </div>
-      {registo ? (
-        <span className="rounded-full bg-laranja-claro px-2.5 py-1 text-[11px] font-semibold text-laranja-escuro">Registada</span>
-      ) : erroProximo ? (
+      {erroProximo ? (
         <button className="botao-secundario px-3 py-1.5 text-xs" onClick={carregarProximo}>
           Tentar de novo
         </button>
@@ -146,17 +165,17 @@ export function NovaNota({ inicial }: Props) {
 
   const acoes = (
     <>
-      <button className="botao-primario flex-1 lg:flex-none" onClick={() => executar("pdf")} disabled={!!ocupado || !form}>
+      <button className="botao-primario flex-1 lg:flex-none" onClick={() => pedirConfirmacao("pdf")} disabled={!!ocupado || !form}>
         <IconeDescarregar />
-        {ocupado === "pdf" ? "A gerar…" : registo && !sujo ? "Descarregar PDF" : "Guardar e gerar PDF"}
+        {ocupado === "pdf" ? "A registar…" : "Registar e gerar PDF"}
       </button>
       {podePartilhar && (
-        <button className="botao-secundario" onClick={() => executar("partilhar")} disabled={!!ocupado || !form} aria-label="Partilhar PDF">
+        <button className="botao-secundario" onClick={() => pedirConfirmacao("partilhar")} disabled={!!ocupado || !form} aria-label="Registar e partilhar PDF">
           <IconePartilhar />
           <span className="hidden sm:inline">Partilhar</span>
         </button>
       )}
-      <button className="botao-secundario" onClick={() => executar("imprimir")} disabled={!!ocupado || !form} aria-label="Imprimir">
+      <button className="botao-secundario" onClick={() => pedirConfirmacao("imprimir")} disabled={!!ocupado || !form} aria-label="Registar e imprimir">
         <IconeImprimir />
         <span className="hidden sm:inline">Imprimir</span>
       </button>
@@ -166,36 +185,14 @@ export function NovaNota({ inicial }: Props) {
   return (
     <>
       <div className="no-print">
-        <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">{registo ? `Nota N.º ${registo.numero}` : "Nova nota de saída"}</h1>
-            <p className="mt-1 text-sm text-tinta-suave">
-              {registo
-                ? "A editar uma nota já registada. As alterações são guardadas ao gerar o PDF ou imprimir."
-                : "Preencha os dados; o número é atribuído automaticamente ao guardar."}
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            {registo && (
-              <Link href={`/notas/${registo.id}`} className="botao-secundario">
-                Ver nota
-              </Link>
-            )}
-            {registo && (
-              <button className="botao-secundario" onClick={novaNota}>
-                <IconeMais />
-                Nova nota
-              </button>
-            )}
-            {registo && sujo && (
-              <button className="botao-primario" onClick={() => executar("guardar")} disabled={!!ocupado}>
-                {ocupado === "guardar" ? "A guardar…" : "Guardar alterações"}
-              </button>
-            )}
-          </div>
+        <div className="mb-5">
+          <h1 className="text-2xl font-bold tracking-tight">Nova nota de saída</h1>
+          <p className="mt-1 text-sm text-tinta-suave">
+            Preencha os dados e registe. O número é atribuído automaticamente e, depois de registada, a nota não pode ser alterada.
+          </p>
         </div>
 
-        {erroProximo && !registo && (
+        {erroProximo && (
           <div className="mb-4 flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
             <IconeAviso className="mt-0.5 shrink-0" />
             <div>
@@ -208,7 +205,7 @@ export function NovaNota({ inicial }: Props) {
         <div className="lg:grid lg:grid-cols-[minmax(0,27rem)_minmax(0,1fr)] lg:items-start lg:gap-8">
           <section className="rounded-3xl border border-linha bg-white p-5 shadow-suave sm:p-6">
             {form ? (
-              <NotaForm valores={form} onChange={alterar} cabecalho={cabecalhoNumero} />
+              <NotaForm valores={form} onChange={setForm} cabecalho={cabecalhoNumero} />
             ) : (
               <div className="space-y-4 py-2" aria-busy="true" aria-label="A carregar">
                 {[0, 1, 2, 3, 4].map((i) => (
@@ -235,6 +232,46 @@ export function NovaNota({ inicial }: Props) {
           <div className="mx-auto flex max-w-xl items-center gap-2">{acoes}</div>
         </div>
 
+        {confirmar && form && (
+          <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center" role="dialog" aria-modal="true" aria-labelledby="confirmar-titulo">
+            <button className="absolute inset-0 bg-tinta/40 backdrop-blur-[2px]" aria-label="Cancelar" onClick={() => setConfirmar(null)} />
+            <div className="relative w-full rounded-t-3xl bg-white p-5 shadow-2xl sm:max-w-md sm:rounded-3xl">
+              <h2 id="confirmar-titulo" className="text-lg font-semibold">
+                Registar a nota N.º {numero || "…"}?
+              </h2>
+              <p className="mt-1 text-sm text-tinta-suave">Depois de registada, a nota não pode ser editada nem eliminada.</p>
+              <dl className="mt-4 space-y-2 rounded-2xl bg-creme px-4 py-3 text-sm">
+                <div className="flex justify-between gap-3">
+                  <dt className="text-tinta-suave">Beneficiário</dt>
+                  <dd className="text-right font-medium">{form.beneficiario.trim()}</dd>
+                </div>
+                {form.origem.trim() && (
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-tinta-suave">Origem</dt>
+                    <dd className="text-right font-medium">{form.origem.trim()}</dd>
+                  </div>
+                )}
+                <div className="flex justify-between gap-3">
+                  <dt className="text-tinta-suave">Itens</dt>
+                  <dd className="text-right font-medium">{form.itens.filter((i) => i.descricao.trim() || i.valor.trim()).length}</dd>
+                </div>
+                <div className="flex justify-between gap-3 border-t border-linha pt-2">
+                  <dt className="text-tinta-suave">Total</dt>
+                  <dd className="text-right text-base font-bold tabular-nums text-laranja-escuro">{formatarKz(total)} Kz</dd>
+                </div>
+              </dl>
+              <div className="mt-4 flex justify-end gap-2">
+                <button className="botao-secundario" onClick={() => setConfirmar(null)}>
+                  Cancelar
+                </button>
+                <button className="botao-primario" onClick={() => registar(confirmar)} autoFocus>
+                  {ROTULO_ACAO[confirmar]}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {aviso && (
           <div
             role="status"
@@ -243,7 +280,12 @@ export function NovaNota({ inicial }: Props) {
             }`}
           >
             {aviso.tipo === "erro" ? <IconeAviso className="text-amarelo" /> : <IconeVerificado className="text-amarelo" />}
-            {aviso.texto}
+            <span>{aviso.texto}</span>
+            {aviso.ligacao && (
+              <Link href={aviso.ligacao.href} className="ml-1 rounded-full bg-white/15 px-2.5 py-0.5 text-xs font-semibold text-amarelo hover:bg-white/25">
+                {aviso.ligacao.rotulo}
+              </Link>
+            )}
           </div>
         )}
       </div>

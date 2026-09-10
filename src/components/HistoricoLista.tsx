@@ -92,7 +92,7 @@ export function HistoricoLista() {
       <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Histórico</h1>
-          <p className="mt-1 text-sm text-tinta-suave">Todas as saídas de caixa registadas. Toque numa nota para ver, reimprimir ou editar.</p>
+          <p className="mt-1 text-sm text-tinta-suave">Todas as saídas de caixa registadas. Toque numa nota para ver ou reimprimir.</p>
         </div>
         <Link href="/" className="botao-primario">
           Nova nota

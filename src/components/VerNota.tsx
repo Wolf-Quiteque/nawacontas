@@ -1,23 +1,20 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { IconeAviso, IconeDescarregar, IconeEditar, IconeImprimir, IconeLixo, IconePartilhar, IconeVerificado } from "./Icones";
+import { IconeAviso, IconeDescarregar, IconeImprimir, IconePartilhar, IconeVerificado } from "./Icones";
 import { NotaSvg, useLayoutNota } from "./NotaPreview";
 import { descarregarPdf, partilharPdf, suportaPartilha } from "@/lib/acoes";
-import { apiEliminar } from "@/lib/api";
 import { anoDaData, dataPorExtenso, formatarKz, type NotaRegisto, registoParaNota } from "@/lib/nota";
 
 type Aviso = { tipo: "ok" | "erro"; texto: string };
 
+/** Página de uma nota registada: apenas consulta e reimpressão (as notas são imutáveis). */
 export function VerNota({ nota }: { nota: NotaRegisto }) {
-  const router = useRouter();
   const dados = registoParaNota(nota);
   const primitivas = useLayoutNota(dados);
-  const [ocupado, setOcupado] = useState<null | "pdf" | "partilhar" | "eliminar">(null);
+  const [ocupado, setOcupado] = useState<null | "pdf" | "partilhar">(null);
   const [podePartilhar, setPodePartilhar] = useState(false);
-  const [confirmar, setConfirmar] = useState(false);
   const [aviso, setAviso] = useState<Aviso | null>(null);
   const timer = useRef<number | null>(null);
 
@@ -53,19 +50,6 @@ export function VerNota({ nota }: { nota: NotaRegisto }) {
     }
   };
 
-  const eliminar = async () => {
-    setOcupado("eliminar");
-    try {
-      await apiEliminar(nota.id);
-      router.push("/historico");
-      router.refresh();
-    } catch (e) {
-      mostrarAviso({ tipo: "erro", texto: e instanceof Error ? e.message : "Não foi possível eliminar." });
-      setOcupado(null);
-      setConfirmar(false);
-    }
-  };
-
   const total = Number(nota.total) || 0;
 
   return (
@@ -89,16 +73,7 @@ export function VerNota({ nota }: { nota: NotaRegisto }) {
               {nota.origem ? ` · ${nota.origem}` : ""} · {dataPorExtenso(nota.data)}
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Link href={`/notas/${nota.id}/editar`} className="botao-secundario">
-              <IconeEditar />
-              Editar
-            </Link>
-            <button className="botao-secundario text-red-700 hover:border-red-200 hover:bg-red-50" onClick={() => setConfirmar(true)}>
-              <IconeLixo />
-              <span className="hidden sm:inline">Eliminar</span>
-            </button>
-          </div>
+          <span className="rounded-full bg-laranja-claro px-3 py-1 text-xs font-semibold text-laranja-escuro">Registada · não editável</span>
         </div>
 
         <div className="lg:grid lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] lg:items-start lg:gap-8">
@@ -150,26 +125,6 @@ export function VerNota({ nota }: { nota: NotaRegisto }) {
           </div>
         </div>
 
-        {confirmar && (
-          <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center" role="dialog" aria-modal="true">
-            <button className="absolute inset-0 bg-tinta/40 backdrop-blur-[2px]" aria-label="Cancelar" onClick={() => setConfirmar(false)} />
-            <div className="relative w-full rounded-t-3xl bg-white p-5 shadow-2xl sm:max-w-sm sm:rounded-3xl">
-              <h2 className="text-lg font-semibold">Eliminar a nota N.º {nota.numero}?</h2>
-              <p className="mt-1 text-sm text-tinta-suave">
-                Esta ação não pode ser anulada. O número {nota.numero} não será reutilizado se já existirem notas posteriores.
-              </p>
-              <div className="mt-4 flex justify-end gap-2">
-                <button className="botao-secundario" onClick={() => setConfirmar(false)} disabled={ocupado === "eliminar"}>
-                  Cancelar
-                </button>
-                <button className="botao bg-red-600 text-white hover:bg-red-700" onClick={eliminar} disabled={ocupado === "eliminar"}>
-                  {ocupado === "eliminar" ? "A eliminar…" : "Eliminar"}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
         {aviso && (
           <div
             role="status"
@@ -202,9 +157,9 @@ export function VerNota({ nota }: { nota: NotaRegisto }) {
             <span className="hidden sm:inline">Partilhar</span>
           </button>
         )}
-        <button className="botao-secundario" onClick={() => window.print()} disabled={!!ocupado} aria-label="Imprimir">
+        <button className="botao-secundario" onClick={() => window.print()} disabled={!!ocupado} aria-label="Reimprimir">
           <IconeImprimir />
-          <span className="hidden sm:inline">Imprimir</span>
+          <span className="hidden sm:inline">Reimprimir</span>
         </button>
       </>
     );
