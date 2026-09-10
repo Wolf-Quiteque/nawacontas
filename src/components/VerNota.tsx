@@ -1,19 +1,22 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { IconeAviso, IconeDescarregar, IconeImprimir, IconePartilhar, IconeVerificado } from "./Icones";
+import { IconeAviso, IconeCopiar, IconeDescarregar, IconeImprimir, IconePartilhar, IconeVerificado } from "./Icones";
 import { NotaSvg, useLayoutNota } from "./NotaPreview";
-import { descarregarPdf, partilharPdf, suportaPartilha } from "@/lib/acoes";
-import { anoDaData, dataPorExtenso, formatarKz, type NotaRegisto, registoParaNota } from "@/lib/nota";
+import { descarregarPdf, imprimirPdf, partilharPdf, suportaPartilha } from "@/lib/acoes";
+import { reutilizarNota } from "@/lib/armazenamento";
+import { anoDaData, dataPorExtenso, formatarKz, hojeISO, type NotaRegisto, registoParaNota } from "@/lib/nota";
 
 type Aviso = { tipo: "ok" | "erro"; texto: string };
 
 /** Página de uma nota registada: apenas consulta e reimpressão (as notas são imutáveis). */
 export function VerNota({ nota }: { nota: NotaRegisto }) {
+  const router = useRouter();
   const dados = registoParaNota(nota);
   const primitivas = useLayoutNota(dados);
-  const [ocupado, setOcupado] = useState<null | "pdf" | "partilhar">(null);
+  const [ocupado, setOcupado] = useState<null | "pdf" | "partilhar" | "imprimir">(null);
   const [podePartilhar, setPodePartilhar] = useState(false);
   const [aviso, setAviso] = useState<Aviso | null>(null);
   const timer = useRef<number | null>(null);
@@ -50,6 +53,30 @@ export function VerNota({ nota }: { nota: NotaRegisto }) {
     }
   };
 
+  const imprimir = async () => {
+    setOcupado("imprimir");
+    try {
+      const modo = await imprimirPdf(dados);
+      if (modo === "partilha") mostrarAviso({ tipo: "ok", texto: "Escolha “Imprimir” no menu de partilha." });
+      else if (modo === "descarga") mostrarAviso({ tipo: "ok", texto: "PDF descarregado — imprima a partir do visualizador." });
+      else if (modo === "janela") mostrarAviso({ tipo: "ok", texto: "PDF aberto noutro separador — use Imprimir (Cmd+P)." });
+    } catch (e) {
+      mostrarAviso({ tipo: "erro", texto: e instanceof Error ? e.message : "Não foi possível imprimir." });
+    } finally {
+      setOcupado(null);
+    }
+  };
+
+  /** Copia os dados desta nota para uma nova nota (com novo número e data de hoje). */
+  const reutilizar = () => {
+    reutilizarNota(
+      { beneficiario: nota.beneficiario, origem: nota.origem, periodo: nota.periodo, itens: nota.itens, cidade: nota.cidade, data: nota.data },
+      nota.numero,
+      hojeISO(),
+    );
+    router.push("/");
+  };
+
   const total = Number(nota.total) || 0;
 
   return (
@@ -73,7 +100,13 @@ export function VerNota({ nota }: { nota: NotaRegisto }) {
               {nota.origem ? ` · ${nota.origem}` : ""} · {dataPorExtenso(nota.data)}
             </p>
           </div>
-          <span className="rounded-full bg-laranja-claro px-3 py-1 text-xs font-semibold text-laranja-escuro">Registada · não editável</span>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded-full bg-laranja-claro px-3 py-1 text-xs font-semibold text-laranja-escuro">Registada · não editável</span>
+            <button className="botao-secundario" onClick={reutilizar} title="Criar uma nova nota com os mesmos dados">
+              <IconeCopiar />
+              Reutilizar
+            </button>
+          </div>
         </div>
 
         <div className="lg:grid lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] lg:items-start lg:gap-8">
@@ -157,9 +190,9 @@ export function VerNota({ nota }: { nota: NotaRegisto }) {
             <span className="hidden sm:inline">Partilhar</span>
           </button>
         )}
-        <button className="botao-secundario" onClick={() => window.print()} disabled={!!ocupado} aria-label="Reimprimir">
+        <button className="botao-secundario" onClick={imprimir} disabled={!!ocupado} aria-label="Reimprimir">
           <IconeImprimir />
-          <span className="hidden sm:inline">Reimprimir</span>
+          <span className="hidden sm:inline">{ocupado === "imprimir" ? "A preparar…" : "Reimprimir"}</span>
         </button>
       </>
     );

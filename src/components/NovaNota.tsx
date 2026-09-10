@@ -6,9 +6,9 @@ import { flushSync } from "react-dom";
 import { IconeAviso, IconeDescarregar, IconeImprimir, IconePartilhar, IconeVerificado } from "./Icones";
 import { type Formulario, NotaForm, paraEntrada, paraFormulario } from "./NotaForm";
 import { NotaSvg, useLayoutNota } from "./NotaPreview";
-import { descarregarPdf, partilharPdf, suportaPartilha } from "@/lib/acoes";
+import { descarregarPdf, imprimirPdf, type ModoImpressao, partilharPdf, suportaPartilha } from "@/lib/acoes";
 import { apiCriar, apiProximoNumero } from "@/lib/api";
-import { guardarRascunho, lerRascunho, limparRascunho } from "@/lib/armazenamento";
+import { consumirReutilizada, guardarRascunho, lerRascunho, limparRascunho } from "@/lib/armazenamento";
 import { anoDaData, formatarKz, notaPadrao, type NotaData, type NotaRegisto, registoParaNota, totalDaNota } from "@/lib/nota";
 
 type Acao = "pdf" | "partilhar" | "imprimir";
@@ -20,20 +20,13 @@ const ROTULO_ACAO: Record<Acao, string> = {
   imprimir: "Registar e imprimir",
 };
 
-/** Espera o fecho do diálogo de impressão (afterprint) ou, no máximo, 1,5 s. */
-function aguardarImpressao(): Promise<void> {
-  return new Promise((resolve) => {
-    let feito = false;
-    const concluir = () => {
-      if (feito) return;
-      feito = true;
-      window.removeEventListener("afterprint", concluir);
-      resolve();
-    };
-    window.addEventListener("afterprint", concluir);
-    window.setTimeout(concluir, 1500);
-  });
-}
+const MENSAGEM_IMPRESSAO: Record<ModoImpressao, string> = {
+  pdf: "Enviada para impressão.",
+  partilha: "Escolha “Imprimir” no menu de partilha.",
+  descarga: "PDF descarregado — imprima a partir do visualizador.",
+  janela: "PDF aberto noutro separador — use Imprimir (Cmd+P).",
+  html: "Enviada para impressão.",
+};
 
 export function NovaNota() {
   const [form, setForm] = useState<Formulario | null>(null);
@@ -46,6 +39,12 @@ export function NovaNota() {
   const [podePartilhar, setPodePartilhar] = useState(false);
   const [aviso, setAviso] = useState<Aviso | null>(null);
   const avisoTimer = useRef<number | null>(null);
+
+  const mostrarAviso = useCallback((a: Aviso) => {
+    setAviso(a);
+    if (avisoTimer.current) window.clearTimeout(avisoTimer.current);
+    avisoTimer.current = window.setTimeout(() => setAviso(null), a.tipo === "erro" ? 6000 : 8000);
+  }, []);
 
   const carregarProximo = useCallback(async () => {
     setErroProximo(null);
@@ -62,9 +61,11 @@ export function NovaNota() {
     const rascunho = lerRascunho();
     setForm(paraFormulario(rascunho ?? notaPadrao()));
     setPodePartilhar(suportaPartilha());
+    const reutilizada = consumirReutilizada();
+    if (reutilizada) mostrarAviso({ tipo: "ok", texto: `Dados da nota N.º ${reutilizada} copiados. Reveja e registe como nova nota.` });
     /* eslint-enable react-hooks/set-state-in-effect */
     void carregarProximo();
-  }, [carregarProximo]);
+  }, [carregarProximo, mostrarAviso]);
 
   // Rascunho automático da nota em preenchimento.
   useEffect(() => {
@@ -75,12 +76,6 @@ export function NovaNota() {
   const nota: NotaData = useMemo(() => ({ ...(form ? paraEntrada(form) : notaPadrao()), numero }), [form, numero]);
   const primitivas = useLayoutNota(nota);
   const total = totalDaNota(nota);
-
-  const mostrarAviso = useCallback((a: Aviso) => {
-    setAviso(a);
-    if (avisoTimer.current) window.clearTimeout(avisoTimer.current);
-    avisoTimer.current = window.setTimeout(() => setAviso(null), a.tipo === "erro" ? 6000 : 8000);
-  }, []);
 
   /** Validação rápida antes de pedir confirmação. */
   const problema = (): string | null => {
@@ -109,6 +104,7 @@ export function NovaNota() {
     setConfirmar(null);
     setOcupado(acao);
     let registada: NotaRegisto | null = null;
+    let detalhe = "";
     try {
       registada = await apiCriar(paraEntrada(form));
       // Garante que a pré-visualização/impressão usa o número definitivo antes de agir.
@@ -116,10 +112,7 @@ export function NovaNota() {
       const dados = registoParaNota(registada);
       if (acao === "pdf") await descarregarPdf(dados);
       else if (acao === "partilhar") await partilharPdf(dados);
-      else {
-        window.print();
-        await aguardarImpressao();
-      }
+      else detalhe = MENSAGEM_IMPRESSAO[await imprimirPdf(dados)];
     } catch (e) {
       if (!registada) {
         mostrarAviso({ tipo: "erro", texto: e instanceof Error ? e.message : "Não foi possível registar a nota." });
@@ -139,7 +132,7 @@ export function NovaNota() {
     window.scrollTo({ top: 0, behavior: "smooth" });
     mostrarAviso({
       tipo: "ok",
-      texto: `Nota N.º ${registada.numero} registada. Nova nota pronta.`,
+      texto: `Nota N.º ${registada.numero} registada. ${detalhe ? `${detalhe} ` : ""}Nova nota pronta.`,
       ligacao: { href: `/notas/${registada.id}`, rotulo: "Ver" },
     });
   };

@@ -1,5 +1,6 @@
 import { nomeFicheiro, type NotaData } from "./nota";
 import { gerarPdf } from "./pdf";
+import { ehAndroid, ehIOS, ehSafari } from "./pwa";
 
 /** Indica se o dispositivo suporta partilhar ficheiros (share sheet do iOS/Android). */
 export function suportaPartilha(): boolean {
@@ -11,10 +12,13 @@ export function suportaPartilha(): boolean {
   }
 }
 
-export async function descarregarPdf(nota: NotaData): Promise<void> {
+async function blobDoPdf(nota: NotaData): Promise<Blob> {
   const bytes = await gerarPdf(nota);
-  const blob = new Blob([bytes as BlobPart], { type: "application/pdf" });
-  const url = URL.createObjectURL(blob);
+  return new Blob([bytes as BlobPart], { type: "application/pdf" });
+}
+
+export async function descarregarPdf(nota: NotaData): Promise<void> {
+  const url = URL.createObjectURL(await blobDoPdf(nota));
   const a = document.createElement("a");
   a.href = url;
   a.download = nomeFicheiro(nota);
@@ -36,4 +40,76 @@ export async function partilharPdf(nota: NotaData): Promise<boolean> {
     if (e instanceof DOMException && e.name === "AbortError") return false;
     throw e;
   }
+}
+
+export type ModoImpressao = "pdf" | "partilha" | "descarga" | "janela" | "html";
+
+/**
+ * Imprime a nota a partir do PDF gerado (página A4 exata, sem margens nem cabeçalhos do navegador).
+ *
+ * - Computador (Chrome/Edge/Firefox): PDF carregado num iframe escondido e enviado para a impressora.
+ * - iPhone/iPad: o Safari não imprime bem HTML; abre-se a folha de partilha, onde existe "Imprimir" (AirPrint).
+ * - Android: descarrega o PDF, que pode ser impresso a partir do visualizador.
+ * - Safari de computador: abre o PDF num novo separador para imprimir com Cmd+P.
+ */
+export async function imprimirPdf(nota: NotaData): Promise<ModoImpressao> {
+  if (ehIOS()) {
+    if (suportaPartilha()) {
+      await partilharPdf(nota);
+      return "partilha";
+    }
+    window.print();
+    return "html";
+  }
+  if (ehAndroid()) {
+    if (suportaPartilha()) {
+      await partilharPdf(nota);
+      return "partilha";
+    }
+    await descarregarPdf(nota);
+    return "descarga";
+  }
+
+  const blob = await blobDoPdf(nota);
+  const url = URL.createObjectURL(blob);
+
+  if (ehSafari()) {
+    const w = window.open(url, "_blank");
+    if (!w) {
+      await descarregarPdf(nota);
+      return "descarga";
+    }
+    window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    return "janela";
+  }
+
+  const iframe = document.createElement("iframe");
+  iframe.setAttribute("aria-hidden", "true");
+  iframe.style.cssText = "position:fixed;right:0;bottom:0;width:1px;height:1px;border:0;opacity:0;pointer-events:none";
+  iframe.src = url;
+
+  await new Promise<void>((resolve) => {
+    let feito = false;
+    const concluir = () => {
+      if (feito) return;
+      feito = true;
+      try {
+        iframe.contentWindow?.focus();
+        iframe.contentWindow?.print(); // no Chrome bloqueia até o diálogo fechar
+      } catch {
+        window.print();
+      }
+      resolve();
+    };
+    iframe.addEventListener("load", () => window.setTimeout(concluir, 150));
+    window.setTimeout(concluir, 4000); // recurso caso o evento load não dispare
+    document.body.appendChild(iframe);
+  });
+
+  // Mantém o iframe algum tempo para o diálogo de impressão terminar de ler o documento.
+  window.setTimeout(() => {
+    iframe.remove();
+    URL.revokeObjectURL(url);
+  }, 120_000);
+  return "pdf";
 }

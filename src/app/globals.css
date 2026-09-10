@@ -75,17 +75,20 @@ body {
   .no-print {
     display: none !important;
   }
+  /* Recurso (a impressão normal usa o PDF): a página inteira encaixa na área imprimível,
+     alinhada ao topo e à esquerda, mesmo que o navegador aplique margens. */
   #print-area {
     display: block !important;
-    position: fixed;
-    inset: 0;
-    width: 210mm;
-    height: 297mm;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
     background: #fff;
   }
   #print-area svg {
     display: block;
-    width: 210mm;
-    height: 297mm;
+    width: 100%;
+    height: auto;
+    max-height: 100vh;
   }
 }

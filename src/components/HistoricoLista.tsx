@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { IconeAviso, IconePesquisar, IconeSeta } from "./Icones";
+import { IconeAviso, IconeCopiar, IconePesquisar, IconeSeta } from "./Icones";
 import { apiListar, type FiltrosApi } from "@/lib/api";
+import { reutilizarNota } from "@/lib/armazenamento";
 import { anoDaData, dataPorExtenso, formatarKz, hojeISO, MESES, type NotaRegisto } from "@/lib/nota";
 
 type Atalho = "tudo" | "hoje" | "mes" | "mesPassado" | "ano";
@@ -43,6 +45,7 @@ function resumoItens(n: NotaRegisto): string {
 }
 
 export function HistoricoLista() {
+  const router = useRouter();
   const [q, setQ] = useState("");
   const [de, setDe] = useState("");
   const [ate, setAte] = useState("");
@@ -78,6 +81,15 @@ export function HistoricoLista() {
   };
 
   const total = useMemo(() => (notas ?? []).reduce((s, n) => s + (Number(n.total) || 0), 0), [notas]);
+
+  const reutilizar = (n: NotaRegisto) => {
+    reutilizarNota(
+      { beneficiario: n.beneficiario, origem: n.origem, periodo: n.periodo, itens: n.itens, cidade: n.cidade, data: n.data },
+      n.numero,
+      hojeISO(),
+    );
+    router.push("/");
+  };
 
   const atalhos: Array<[Atalho, string]> = [
     ["tudo", "Tudo"],
@@ -216,7 +228,7 @@ export function HistoricoLista() {
                   <th className="px-3 py-3 font-semibold">Itens</th>
                   <th className="px-3 py-3 font-semibold">Data</th>
                   <th className="px-3 py-3 text-right font-semibold">Total (Kz)</th>
-                  <th className="w-10 px-3 py-3" />
+                  <th className="w-24 px-3 py-3" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-linha">
@@ -239,7 +251,15 @@ export function HistoricoLista() {
                     </td>
                     <td className="px-3 py-3 tabular-nums text-tinta-suave">{dataCurta(n.data)}</td>
                     <td className="px-3 py-3 text-right font-semibold tabular-nums">{formatarKz(Number(n.total) || 0)}</td>
-                    <td className="px-3 py-3 text-right">
+                    <td className="px-3 py-3 text-right whitespace-nowrap">
+                      <button
+                        className="botao-fantasma px-2"
+                        onClick={() => reutilizar(n)}
+                        aria-label={`Reutilizar dados da nota ${n.numero}`}
+                        title="Reutilizar numa nova nota"
+                      >
+                        <IconeCopiar />
+                      </button>
                       <Link href={`/notas/${n.id}`} className="botao-fantasma px-2" aria-label={`Abrir nota ${n.numero}`}>
                         <IconeSeta />
                       </Link>
