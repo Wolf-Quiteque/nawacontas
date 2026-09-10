@@ -1,7 +1,7 @@
 import type { NotaEntrada } from "./nota";
 
 /** Rascunho da nota em edição (apenas para a nota nova), guardado no dispositivo. */
-const CHAVE_RASCUNHO = "nawanotas.rascunho.v2";
+const CHAVE_RASCUNHO = "nawanotas.rascunho.v3";
 
 export function lerRascunho(): NotaEntrada | null {
   try {

@@ -1,20 +1,28 @@
 import { kwanzasPorExtenso } from "./extenso";
 
-/** Dados introduzidos pelo utilizador para uma nota de pagamento. */
+/** Linha da lista de saídas (ex.: "Portagem", qtd "3", 9000). */
+export interface ItemSaida {
+  descricao: string;
+  /** Quantidade ou observação curta (texto livre, opcional). */
+  qtd: string;
+  /** Valor da linha em kwanzas. */
+  valor: number;
+}
+
+/** Número máximo de itens que cabem numa página A4. */
+export const MAX_ITENS = 12;
+
+/** Dados de uma nota de saída de caixa. */
 export interface NotaData {
-  /** Número sequencial da nota (ex.: "18"). */
+  /** Número sequencial da nota (ex.: "36"). */
   numero: string;
-  nome: string;
-  motivo: string;
+  /** Quem recebe o dinheiro. */
+  beneficiario: string;
+  /** De onde sai o dinheiro: Caixa, Cartão, Transferência, ... */
+  origem: string;
+  /** Período ou referência a que a saída diz respeito (opcional). */
   periodo: string;
-  /** Remuneração de referência em kwanzas. */
-  remuneracao: number;
-  /** Texto livre da coluna "Taxa" na linha de remuneração (normalmente vazio). */
-  taxaRemuneracao: string;
-  /** Desconto para a Segurança Social em kwanzas. */
-  desconto: number;
-  /** Texto da coluna "Taxa" na linha do desconto (ex.: "3%"). */
-  taxaDesconto: string;
+  itens: ItemSaida[];
   cidade: string;
   /** Data no formato ISO (AAAA-MM-DD). */
   data: string;
@@ -27,6 +35,7 @@ export type NotaEntrada = Omit<NotaData, "numero">;
 export interface NotaRegisto extends NotaEntrada {
   id: string;
   numero: number;
+  total: number;
   criadaEm: string;
   atualizadaEm: string;
 }
@@ -34,13 +43,10 @@ export interface NotaRegisto extends NotaEntrada {
 export function registoParaNota(r: NotaRegisto): NotaData {
   return {
     numero: String(r.numero),
-    nome: r.nome,
-    motivo: r.motivo,
+    beneficiario: r.beneficiario,
+    origem: r.origem,
     periodo: r.periodo,
-    remuneracao: Number(r.remuneracao) || 0,
-    taxaRemuneracao: r.taxaRemuneracao,
-    desconto: Number(r.desconto) || 0,
-    taxaDesconto: r.taxaDesconto,
+    itens: (r.itens ?? []).map((i) => ({ descricao: i.descricao, qtd: i.qtd ?? "", valor: Number(i.valor) || 0 })),
     cidade: r.cidade,
     data: r.data,
   };
@@ -60,6 +66,8 @@ export const MESES = [
   "novembro",
   "dezembro",
 ];
+
+export const ORIGENS_SUGERIDAS = ["Caixa", "Cartão", "Transferência bancária", "Multicaixa Express", "Depósito"];
 
 /** Data de hoje em formato ISO local (AAAA-MM-DD). */
 export function hojeISO(): string {
@@ -98,24 +106,21 @@ export function formatarKz(valor: number): string {
   return `${negativo ? "-" : ""}${comPontos},${dec}`;
 }
 
-export function valorLiquido(n: Pick<NotaData, "remuneracao" | "desconto">): number {
-  const v = (n.remuneracao || 0) - (n.desconto || 0);
-  return Math.round(v * 100) / 100;
+export function totalDaNota(n: Pick<NotaData, "itens">): number {
+  const soma = (n.itens ?? []).reduce((s, i) => s + (Number(i.valor) || 0), 0);
+  return Math.round(soma * 100) / 100;
 }
 
-export function notaPadrao(numero = "1"): NotaData {
+export function notaPadrao(numero = ""): NotaData {
   const hoje = hojeISO();
   const p = partesData(hoje)!;
   const mes = MESES[p.mes - 1];
   return {
     numero,
-    nome: "",
-    motivo: "",
+    beneficiario: "",
+    origem: "",
     periodo: `${mes.charAt(0).toUpperCase()}${mes.slice(1)} de ${p.ano}`,
-    remuneracao: 0,
-    taxaRemuneracao: "",
-    desconto: 0,
-    taxaDesconto: "",
+    itens: [{ descricao: "", qtd: "", valor: 0 }],
     cidade: "Luanda",
     data: hoje,
   };
@@ -125,49 +130,46 @@ export function notaPadrao(numero = "1"): NotaData {
 export interface NotaTextos {
   numeroCompleto: string;
   introducao: string;
-  nome: string;
-  motivo: string;
+  beneficiario: string;
+  origem: string;
   periodo: string;
-  remuneracao: string;
-  taxaRemuneracao: string;
-  desconto: string;
-  taxaDesconto: string;
-  liquido: string;
+  itens: Array<{ descricao: string; qtd: string; valor: string }>;
+  total: string;
   extenso: string;
   declaracao: string;
   localData: string;
 }
 
 export function textosDaNota(n: NotaData): NotaTextos {
-  const liquido = valorLiquido(n);
+  const total = totalDaNota(n);
+  const itens = (n.itens ?? [])
+    .filter((i) => i.descricao.trim() || i.valor)
+    .map((i) => ({ descricao: i.descricao.trim(), qtd: (i.qtd ?? "").trim(), valor: formatarKz(Number(i.valor) || 0) }));
   return {
     numeroCompleto: `N.º ${n.numero.trim() || "—"} / ${anoDaData(n.data)}`,
     introducao:
-      "A empresa NawaBus declara, para os devidos efeitos, o pagamento ao trabalhador abaixo identificado, " +
-      "referente aos serviços prestados na função de motorista.",
-    nome: n.nome.trim(),
-    motivo: (n.motivo ?? "").trim(),
+      "A empresa NawaBus declara, para os devidos efeitos, a saída de caixa abaixo identificada, " +
+      "entregue ao beneficiário indicado e referente aos itens discriminados neste documento.",
+    beneficiario: n.beneficiario.trim(),
+    origem: n.origem.trim(),
     periodo: n.periodo.trim(),
-    remuneracao: formatarKz(n.remuneracao || 0),
-    taxaRemuneracao: n.taxaRemuneracao.trim(),
-    desconto: formatarKz(n.desconto || 0),
-    taxaDesconto: n.taxaDesconto.trim(),
-    liquido: formatarKz(liquido),
-    extenso: `Valor por extenso: ${kwanzasPorExtenso(liquido)}`,
+    itens,
+    total: formatarKz(total),
+    extenso: `Valor por extenso: ${kwanzasPorExtenso(total)}`,
     declaracao:
-      "Declaro ter recebido da NawaBus o valor líquido acima indicado, relativo ao período de pagamento assinalado neste documento.",
+      "Declaro ter recebido da NawaBus o valor total acima indicado, relativo aos itens discriminados neste documento.",
     localData: `${n.cidade.trim() || "Luanda"}, ${dataPorExtenso(n.data)}`,
   };
 }
 
 /** Nome de ficheiro sugerido para o PDF. */
 export function nomeFicheiro(n: NotaData): string {
-  const nome = n.nome
+  const nome = n.beneficiario
     .trim()
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "")
     .replace(/[^A-Za-z0-9]+/g, "_")
     .replace(/^_+|_+$/g, "");
   const num = (n.numero.trim() || "0").replace(/[^0-9A-Za-z]+/g, "-");
-  return `Nota_de_Pagamento_NawaBus_${num}_${anoDaData(n.data)}${nome ? `_${nome}` : ""}.pdf`;
+  return `Nota_de_Saida_de_Caixa_NawaBus_${num}_${anoDaData(n.data)}${nome ? `_${nome}` : ""}.pdf`;
 }

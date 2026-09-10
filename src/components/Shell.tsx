@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { IconeFechar, IconeHistorico, IconeMais, IconeMenu } from "./Icones";
+import { IconeFechar, IconeHistorico, IconeInstalar, IconeMais, IconeMenu } from "./Icones";
+import { InstalarModal } from "./InstalarModal";
 
 const NAV = [
   { href: "/", rotulo: "Nova nota", descricao: "Criar e imprimir", Icone: IconeMais, ativo: (p: string) => p === "/" },
@@ -32,7 +33,7 @@ function Marca() {
         <span className="block text-[17px] font-bold tracking-tight">
           Nawa<span className="text-laranja">Notas</span>
         </span>
-        <span className="block text-[11px] text-tinta-suave">Notas de pagamento NawaBus</span>
+        <span className="block text-[11px] text-tinta-suave">Saídas de caixa NawaBus</span>
       </span>
     </Link>
   );
@@ -50,9 +51,7 @@ function Navegacao({ pathname, onNavegar }: { pathname: string; onNavegar?: () =
             onClick={onNavegar}
             aria-current={estaAtivo ? "page" : undefined}
             className={`flex items-center gap-3 rounded-2xl px-3 py-2.5 transition ${
-              estaAtivo
-                ? "bg-laranja text-white shadow-suave"
-                : "text-tinta hover:bg-laranja-claro/70"
+              estaAtivo ? "bg-laranja text-white shadow-suave" : "text-tinta hover:bg-laranja-claro/70"
             }`}
           >
             <span
@@ -64,9 +63,7 @@ function Navegacao({ pathname, onNavegar }: { pathname: string; onNavegar?: () =
             </span>
             <span className="leading-tight">
               <span className="block text-sm font-semibold">{rotulo}</span>
-              <span className={`block text-[11px] ${estaAtivo ? "text-white/80" : "text-tinta-suave"}`}>
-                {descricao}
-              </span>
+              <span className={`block text-[11px] ${estaAtivo ? "text-white/80" : "text-tinta-suave"}`}>{descricao}</span>
             </span>
           </Link>
         );
@@ -75,9 +72,27 @@ function Navegacao({ pathname, onNavegar }: { pathname: string; onNavegar?: () =
   );
 }
 
+function BotaoInstalar({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="flex w-full items-center gap-3 rounded-2xl border border-linha bg-amarelo-claro/60 px-3 py-2.5 text-left transition hover:bg-amarelo-claro"
+    >
+      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white text-laranja-escuro">
+        <IconeInstalar />
+      </span>
+      <span className="leading-tight">
+        <span className="block text-sm font-semibold">Instalar app</span>
+        <span className="block text-[11px] text-tinta-suave">Telemóvel e computador</span>
+      </span>
+    </button>
+  );
+}
+
 export function Shell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [menuAberto, setMenuAberto] = useState(false);
+  const [instalarAberto, setInstalarAberto] = useState(false);
 
   useEffect(() => {
     if (!menuAberto) return;
@@ -90,6 +105,11 @@ export function Shell({ children }: { children: React.ReactNode }) {
     };
   }, [menuAberto]);
 
+  const abrirInstalar = () => {
+    setMenuAberto(false);
+    setInstalarAberto(true);
+  };
+
   return (
     <div className="min-h-dvh lg:grid lg:grid-cols-[17rem_minmax(0,1fr)]">
       {/* Menu lateral (computador) */}
@@ -100,8 +120,11 @@ export function Shell({ children }: { children: React.ReactNode }) {
         <div className="mt-8">
           <Navegacao pathname={pathname} />
         </div>
-        <div className="mt-auto rounded-2xl bg-amarelo-claro/70 p-3.5 text-[11px] leading-relaxed text-tinta-suave">
-          Todas as notas ficam registadas na base de dados com numeração sequencial automática.
+        <div className="mt-auto space-y-3">
+          <BotaoInstalar onClick={abrirInstalar} />
+          <p className="px-1 text-[11px] leading-relaxed text-tinta-suave">
+            Todas as notas ficam registadas na base de dados com numeração sequencial automática.
+          </p>
         </div>
       </aside>
 
@@ -109,31 +132,20 @@ export function Shell({ children }: { children: React.ReactNode }) {
         {/* Barra superior (telemóvel) */}
         <header className="no-print sticky top-0 z-30 border-b border-linha/80 bg-creme/85 backdrop-blur lg:hidden">
           <div className="flex items-center gap-2 px-3 py-2.5">
-            <button
-              className="botao-fantasma px-2"
-              onClick={() => setMenuAberto(true)}
-              aria-label="Abrir menu"
-              aria-expanded={menuAberto}
-            >
+            <button className="botao-fantasma px-2" onClick={() => setMenuAberto(true)} aria-label="Abrir menu" aria-expanded={menuAberto}>
               <IconeMenu />
             </button>
             <Marca />
           </div>
         </header>
 
-        <main className="mx-auto w-full max-w-6xl flex-1 px-4 pb-32 pt-5 sm:px-6 lg:px-8 lg:pb-12 lg:pt-8">
-          {children}
-        </main>
+        <main className="mx-auto w-full max-w-6xl flex-1 px-4 pb-32 pt-5 sm:px-6 lg:px-8 lg:pb-12 lg:pt-8">{children}</main>
       </div>
 
       {/* Gaveta (telemóvel) */}
       {menuAberto && (
         <div className="no-print fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true" aria-label="Menu">
-          <button
-            className="absolute inset-0 bg-tinta/40 backdrop-blur-[2px]"
-            aria-label="Fechar menu"
-            onClick={() => setMenuAberto(false)}
-          />
+          <button className="absolute inset-0 bg-tinta/40 backdrop-blur-[2px]" aria-label="Fechar menu" onClick={() => setMenuAberto(false)} />
           <div className="absolute inset-y-0 left-0 flex w-[82%] max-w-xs flex-col bg-white px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 shadow-2xl">
             <div className="flex items-center justify-between">
               <Marca />
@@ -144,12 +156,17 @@ export function Shell({ children }: { children: React.ReactNode }) {
             <div className="mt-6">
               <Navegacao pathname={pathname} onNavegar={() => setMenuAberto(false)} />
             </div>
-            <div className="mt-auto rounded-2xl bg-amarelo-claro/70 p-3.5 text-[11px] leading-relaxed text-tinta-suave">
-              Todas as notas ficam registadas na base de dados com numeração sequencial automática.
+            <div className="mt-auto space-y-3">
+              <BotaoInstalar onClick={abrirInstalar} />
+              <p className="px-1 text-[11px] leading-relaxed text-tinta-suave">
+                Todas as notas ficam registadas na base de dados com numeração sequencial automática.
+              </p>
             </div>
           </div>
         </div>
       )}
+
+      <InstalarModal aberto={instalarAberto} onFechar={() => setInstalarAberto(false)} />
     </div>
   );
 }

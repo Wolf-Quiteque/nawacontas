@@ -3,19 +3,11 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import {
-  IconeAviso,
-  IconeDescarregar,
-  IconeEditar,
-  IconeImprimir,
-  IconeLixo,
-  IconePartilhar,
-  IconeVerificado,
-} from "./Icones";
+import { IconeAviso, IconeDescarregar, IconeEditar, IconeImprimir, IconeLixo, IconePartilhar, IconeVerificado } from "./Icones";
 import { NotaSvg, useLayoutNota } from "./NotaPreview";
 import { descarregarPdf, partilharPdf, suportaPartilha } from "@/lib/acoes";
 import { apiEliminar } from "@/lib/api";
-import { anoDaData, dataPorExtenso, formatarKz, type NotaRegisto, registoParaNota, valorLiquido } from "@/lib/nota";
+import { anoDaData, dataPorExtenso, formatarKz, type NotaRegisto, registoParaNota } from "@/lib/nota";
 
 type Aviso = { tipo: "ok" | "erro"; texto: string };
 
@@ -74,7 +66,7 @@ export function VerNota({ nota }: { nota: NotaRegisto }) {
     }
   };
 
-  const liquido = valorLiquido(nota);
+  const total = Number(nota.total) || 0;
 
   return (
     <>
@@ -93,8 +85,8 @@ export function VerNota({ nota }: { nota: NotaRegisto }) {
               Nota N.º {nota.numero} <span className="font-normal text-tinta-suave">/ {anoDaData(nota.data)}</span>
             </h1>
             <p className="mt-1 text-sm text-tinta-suave">
-              {nota.nome || "Sem nome"}
-              {nota.motivo ? ` · ${nota.motivo}` : ""} · {dataPorExtenso(nota.data)}
+              {nota.beneficiario || "Sem beneficiário"}
+              {nota.origem ? ` · ${nota.origem}` : ""} · {dataPorExtenso(nota.data)}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -109,25 +101,34 @@ export function VerNota({ nota }: { nota: NotaRegisto }) {
           </div>
         </div>
 
-        <div className="lg:grid lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)] lg:items-start lg:gap-8">
+        <div className="lg:grid lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] lg:items-start lg:gap-8">
           <aside className="space-y-3">
             <div className="rounded-3xl border border-linha bg-white p-5 shadow-suave">
               <dl className="space-y-3 text-sm">
-                <Linha rotulo="Trabalhador" valor={nota.nome || "—"} />
-                <Linha rotulo="Motivo" valor={nota.motivo || "—"} />
+                <Linha rotulo="Beneficiário" valor={nota.beneficiario || "—"} />
+                <Linha rotulo="Origem" valor={nota.origem || "—"} />
                 <Linha rotulo="Período" valor={nota.periodo || "—"} />
-                <Linha rotulo="Remuneração" valor={`${formatarKz(Number(nota.remuneracao))} Kz`} />
-                <Linha
-                  rotulo="Desconto"
-                  valor={`${formatarKz(Number(nota.desconto))} Kz${nota.taxaDesconto ? ` (${nota.taxaDesconto})` : ""}`}
-                />
-                <div className="border-t border-linha pt-3">
-                  <Linha rotulo="Valor líquido" valor={`${formatarKz(liquido)} Kz`} destaque />
-                </div>
-                <Linha rotulo="Local e data" valor={`${nota.cidade}, ${dataPorExtenso(nota.data)}`} />
               </dl>
+              <div className="mt-4 border-t border-linha pt-3">
+                <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-tinta-suave">Itens</p>
+                <ul className="space-y-1.5 text-sm">
+                  {nota.itens.map((i, k) => (
+                    <li key={k} className="flex items-baseline justify-between gap-3">
+                      <span className="min-w-0 truncate">
+                        {i.descricao || <span className="text-tinta-suave">Sem descrição</span>}
+                        {i.qtd && <span className="ml-1.5 text-xs text-tinta-suave">× {i.qtd}</span>}
+                      </span>
+                      <span className="shrink-0 tabular-nums">{formatarKz(i.valor)}</span>
+                    </li>
+                  ))}
+                </ul>
+                <div className="mt-3 flex items-baseline justify-between border-t border-linha pt-3">
+                  <span className="text-sm text-tinta-suave">Total</span>
+                  <span className="text-base font-bold tabular-nums text-laranja-escuro">{formatarKz(total)} Kz</span>
+                </div>
+              </div>
               <p className="mt-4 text-[11px] text-tinta-suave">
-                Registada em {new Date(nota.criadaEm).toLocaleString("pt-PT")}
+                {nota.cidade}, {dataPorExtenso(nota.data)} · registada em {new Date(nota.criadaEm).toLocaleString("pt-PT")}
               </p>
             </div>
             <div className="hidden flex-wrap gap-2 lg:flex">
@@ -210,11 +211,11 @@ export function VerNota({ nota }: { nota: NotaRegisto }) {
   }
 }
 
-function Linha({ rotulo, valor, destaque }: { rotulo: string; valor: string; destaque?: boolean }) {
+function Linha({ rotulo, valor }: { rotulo: string; valor: string }) {
   return (
     <div className="flex items-baseline justify-between gap-3">
       <dt className="shrink-0 text-tinta-suave">{rotulo}</dt>
-      <dd className={`text-right ${destaque ? "text-base font-bold tabular-nums text-laranja-escuro" : "font-medium"}`}>{valor}</dd>
+      <dd className="text-right font-medium">{valor}</dd>
     </div>
   );
 }

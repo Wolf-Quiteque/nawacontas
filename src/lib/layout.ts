@@ -1,6 +1,6 @@
 /**
- * Layout partilhado da nota de pagamento, em pontos (pt) sobre uma página A4.
- * Todas as coordenadas foram medidas no PDF original (Nota_de_Pagamento_..._NawaBus_issac.pdf)
+ * Layout partilhado da nota de saída de caixa, em pontos (pt) sobre uma página A4.
+ * Todas as coordenadas foram medidas no modelo original (Nota_de_Pagamento_..._NawaBus_issac.pdf)
  * e são usadas tanto pelo gerador de PDF (pdf-lib) como pela pré-visualização (SVG),
  * garantindo que ambos são idênticos.
  */
@@ -134,7 +134,7 @@ export function layoutNota(nota: NotaData, measure: Measure): Primitive[] {
 
   // ---- Cabeçalho ----
   text("NAWABUS", 75.25, 83.15, 22.5, { bold: true, color: CORES.laranja });
-  text("NOTA DE PAGAMENTO", 520, 77.05, 16, { bold: true, color: CORES.titulo, align: "right" });
+  text("NOTA DE SAÍDA DE CAIXA", 520, 77.05, 16, { bold: true, color: CORES.titulo, align: "right" });
   rect(69, 116, 457, 2, CORES.laranja);
   text(t.numeroCompleto, BORDA_DIR, 131.73, 9.5, { color: CORES.cinza, align: "right" });
 
@@ -147,9 +147,9 @@ export function layoutNota(nota: NotaData, measure: Measure): Primitive[] {
   const infoX1 = 212.5;
   const infoX2 = 526.5;
   const infoLinhas: Array<[string, string]> = [
-    ["Nome do trabalhador", t.nome],
-    ["Motivo", t.motivo],
-    ["Período de pagamento", t.periodo],
+    ["Beneficiário", t.beneficiario],
+    ["Origem", t.origem],
+    ["Período", t.periodo],
   ];
   const alturaInfo = 25;
   infoLinhas.forEach(([rotulo, valor], i) => {
@@ -177,25 +177,26 @@ export function layoutNota(nota: NotaData, measure: Measure): Primitive[] {
   rect(colX[0], payTop, colX[3] - colX[0], alturaCabecalho, CORES.cabecalhoTabela);
   const yCab = payTop + 15.96;
   text("Descrição", xDesc, yCab, 10.5, { bold: true, color: CORES.branco });
-  text("Taxa", xTaxa, yCab, 10.5, { bold: true, color: CORES.branco, align: "center" });
+  text("Qtd.", xTaxa, yCab, 10.5, { bold: true, color: CORES.branco, align: "center" });
   text("Valor (Kz)", xValor, yCab, 10.5, { bold: true, color: CORES.branco, align: "right" });
 
+  const itens = t.itens.length ? t.itens : [{ descricao: "", qtd: "", valor: "" }];
   const linhasTabela: Array<{ desc: string; taxa: string; valor: string; total?: boolean }> = [
-    { desc: "Remuneração de referência", taxa: t.taxaRemuneracao, valor: t.remuneracao },
-    { desc: "Desconto para a Segurança Social", taxa: t.taxaDesconto, valor: t.desconto },
-    { desc: "Valor líquido a pagar", taxa: "", valor: t.liquido, total: true },
+    ...itens.map((i) => ({ desc: i.descricao, taxa: i.qtd, valor: i.valor })),
+    { desc: "Total", taxa: "", valor: t.total, total: true },
   ];
   linhasTabela.forEach((l, i) => {
     const top = payTop + alturaCabecalho + i * alturaLinha;
     if (l.total) rect(colX[0], top, colX[3] - colX[0], alturaLinha, CORES.fundoTotal);
     const yb = top + 16.58;
-    text(l.desc, xDesc, yb, 10.5, { bold: !!l.total });
+    if (l.desc) text(l.desc, xDesc, yb, 10.5, { bold: !!l.total });
     if (l.taxa) text(l.taxa, xTaxa, yb, 10.5, { bold: !!l.total, align: "center" });
-    text(l.valor, xValor, yb, 10.5, {
-      bold: !!l.total,
-      align: "right",
-      color: l.total ? CORES.totalLaranja : CORES.tinta,
-    });
+    if (l.valor)
+      text(l.valor, xValor, yb, 10.5, {
+        bold: !!l.total,
+        align: "right",
+        color: l.total ? CORES.totalLaranja : CORES.tinta,
+      });
   });
   const payBottom = payTop + alturaCabecalho + alturaLinha * linhasTabela.length;
   const yLinhasH = [payTop, payTop + alturaCabecalho];
@@ -218,13 +219,13 @@ export function layoutNota(nota: NotaData, measure: Measure): Primitive[] {
   const cTrabalhador = 405.25;
   y += 18.62;
   text("Pela NawaBus", cEmpresa, y, 10.5, { bold: true, align: "center" });
-  text("O Trabalhador", cTrabalhador, y, 10.5, { bold: true, align: "center" });
+  text("O Beneficiário", cTrabalhador, y, 10.5, { bold: true, align: "center" });
   y += 12.19;
   text("Nome e assinatura", cEmpresa, y, 8.5, { color: CORES.cinzaClaro, align: "center" });
   text("Nome e assinatura", cTrabalhador, y, 8.5, { color: CORES.cinzaClaro, align: "center" });
 
   // ---- Rodapé ----
-  text("NawaBus — Documento interno de pagamento", PAGE.w / 2, 809.6, 8, {
+  text("NawaBus — Documento interno de saída de caixa", PAGE.w / 2, 809.6, 8, {
     color: CORES.cinzaClaro,
     align: "center",
   });

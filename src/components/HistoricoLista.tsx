@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { IconeAviso, IconePesquisar, IconeSeta } from "./Icones";
 import { apiListar, type FiltrosApi } from "@/lib/api";
-import { anoDaData, dataPorExtenso, formatarKz, hojeISO, MESES, type NotaRegisto, valorLiquido } from "@/lib/nota";
+import { anoDaData, dataPorExtenso, formatarKz, hojeISO, MESES, type NotaRegisto } from "@/lib/nota";
 
 type Atalho = "tudo" | "hoje" | "mes" | "mesPassado" | "ano";
 
@@ -36,6 +36,12 @@ function dataCurta(isoData: string): string {
   return `${m[3]}/${m[2]}/${m[1]}`;
 }
 
+function resumoItens(n: NotaRegisto): string {
+  const nomes = n.itens.map((i) => i.descricao).filter(Boolean);
+  if (!nomes.length) return "";
+  return nomes.length <= 3 ? nomes.join(", ") : `${nomes.slice(0, 3).join(", ")} +${nomes.length - 3}`;
+}
+
 export function HistoricoLista() {
   const [q, setQ] = useState("");
   const [de, setDe] = useState("");
@@ -59,7 +65,6 @@ export function HistoricoLista() {
     }
   }, []);
 
-  // Pesquisa com pequeno atraso para não pedir a cada tecla.
   useEffect(() => {
     const t = window.setTimeout(() => void carregar(filtros), 250);
     return () => window.clearTimeout(t);
@@ -72,7 +77,7 @@ export function HistoricoLista() {
     setAte(t);
   };
 
-  const total = useMemo(() => (notas ?? []).reduce((s, n) => s + valorLiquido(n), 0), [notas]);
+  const total = useMemo(() => (notas ?? []).reduce((s, n) => s + (Number(n.total) || 0), 0), [notas]);
 
   const atalhos: Array<[Atalho, string]> = [
     ["tudo", "Tudo"],
@@ -87,7 +92,7 @@ export function HistoricoLista() {
       <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Histórico</h1>
-          <p className="mt-1 text-sm text-tinta-suave">Todas as notas registadas. Toque numa nota para ver, reimprimir ou editar.</p>
+          <p className="mt-1 text-sm text-tinta-suave">Todas as saídas de caixa registadas. Toque numa nota para ver, reimprimir ou editar.</p>
         </div>
         <Link href="/" className="botao-primario">
           Nova nota
@@ -105,7 +110,7 @@ export function HistoricoLista() {
             <input
               id="pesquisa"
               className="campo pl-10"
-              placeholder="Nome, motivo, período ou número"
+              placeholder="Beneficiário, origem, item ou número"
               value={q}
               onChange={(e) => setQ(e.target.value)}
               type="search"
@@ -169,7 +174,7 @@ export function HistoricoLista() {
         </span>
         {notas && notas.length > 0 && (
           <span>
-            Total líquido: <strong className="tabular-nums text-laranja-escuro">{formatarKz(total)} Kz</strong>
+            Total: <strong className="tabular-nums text-laranja-escuro">{formatarKz(total)} Kz</strong>
           </span>
         )}
       </div>
@@ -206,11 +211,11 @@ export function HistoricoLista() {
               <thead className="bg-creme text-left text-[11px] uppercase tracking-wide text-tinta-suave">
                 <tr>
                   <th className="px-5 py-3 font-semibold">N.º</th>
-                  <th className="px-3 py-3 font-semibold">Trabalhador</th>
-                  <th className="px-3 py-3 font-semibold">Motivo</th>
-                  <th className="px-3 py-3 font-semibold">Período</th>
+                  <th className="px-3 py-3 font-semibold">Beneficiário</th>
+                  <th className="px-3 py-3 font-semibold">Origem</th>
+                  <th className="px-3 py-3 font-semibold">Itens</th>
                   <th className="px-3 py-3 font-semibold">Data</th>
-                  <th className="px-3 py-3 text-right font-semibold">Líquido (Kz)</th>
+                  <th className="px-3 py-3 text-right font-semibold">Total (Kz)</th>
                   <th className="w-10 px-3 py-3" />
                 </tr>
               </thead>
@@ -225,13 +230,15 @@ export function HistoricoLista() {
                     </td>
                     <td className="px-3 py-3 font-medium">
                       <Link href={`/notas/${n.id}`} className="block">
-                        {n.nome || <span className="text-tinta-suave">Sem nome</span>}
+                        {n.beneficiario || <span className="text-tinta-suave">Sem beneficiário</span>}
                       </Link>
                     </td>
-                    <td className="px-3 py-3 text-tinta-suave">{n.motivo || "—"}</td>
-                    <td className="px-3 py-3 text-tinta-suave">{n.periodo || "—"}</td>
+                    <td className="px-3 py-3 text-tinta-suave">{n.origem || "—"}</td>
+                    <td className="max-w-[16rem] truncate px-3 py-3 text-tinta-suave" title={resumoItens(n)}>
+                      {resumoItens(n) || "—"}
+                    </td>
                     <td className="px-3 py-3 tabular-nums text-tinta-suave">{dataCurta(n.data)}</td>
-                    <td className="px-3 py-3 text-right font-semibold tabular-nums">{formatarKz(valorLiquido(n))}</td>
+                    <td className="px-3 py-3 text-right font-semibold tabular-nums">{formatarKz(Number(n.total) || 0)}</td>
                     <td className="px-3 py-3 text-right">
                       <Link href={`/notas/${n.id}`} className="botao-fantasma px-2" aria-label={`Abrir nota ${n.numero}`}>
                         <IconeSeta />
@@ -251,15 +258,13 @@ export function HistoricoLista() {
                       {n.numero}
                     </span>
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-semibold">{n.nome || "Sem nome"}</span>
+                      <span className="block truncate text-sm font-semibold">{n.beneficiario || "Sem beneficiário"}</span>
                       <span className="block truncate text-xs text-tinta-suave">
-                        {[n.motivo, n.periodo].filter(Boolean).join(" · ") || dataPorExtenso(n.data)}
+                        {[n.origem, resumoItens(n)].filter(Boolean).join(" · ") || dataPorExtenso(n.data)}
                       </span>
                       <span className="block text-[11px] tabular-nums text-tinta-suave/80">{dataCurta(n.data)}</span>
                     </span>
-                    <span className="shrink-0 text-sm font-semibold tabular-nums text-laranja-escuro">
-                      {formatarKz(valorLiquido(n))}
-                    </span>
+                    <span className="shrink-0 text-sm font-semibold tabular-nums text-laranja-escuro">{formatarKz(Number(n.total) || 0)}</span>
                     <IconeSeta className="shrink-0 text-tinta-suave/60" />
                   </Link>
                 </li>

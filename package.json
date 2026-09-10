@@ -9,7 +9,8 @@
     "lint": "eslint",
     "icons": "node scripts/icons.mjs",
     "test:pdf": "tsx scripts/test-pdf.ts out-teste.pdf",
-    "test:db": "tsx --conditions react-server scripts/test-db.ts"
+    "test:db": "tsx --conditions react-server scripts/test-db.ts",
+    "check:db": "tsx --conditions react-server scripts/check-db.ts"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.8",

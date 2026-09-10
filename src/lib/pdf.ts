@@ -63,7 +63,7 @@ export async function gerarPdf(nota: NotaData): Promise<Uint8Array> {
   const measure: Measure = (text, size, bold) =>
     (bold ? f.bold : f.regular).widthOfTextAtSize(limpar(text, f.suportados), size);
 
-  doc.setTitle(`Nota de Pagamento NawaBus N.º ${nota.numero}`);
+  doc.setTitle(`Nota de Saída de Caixa NawaBus N.º ${nota.numero}`);
   doc.setAuthor("NawaBus");
   doc.setProducer("NawaNotas");
   doc.setCreator("NawaNotas");

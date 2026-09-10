@@ -58,10 +58,7 @@ export function NovaNota({ inicial }: Props) {
   }, [form, registo]);
 
   const numero = registo ? String(registo.numero) : proximo !== null ? String(proximo) : "";
-  const nota: NotaData = useMemo(
-    () => ({ ...(form ? paraEntrada(form) : notaPadrao()), numero }),
-    [form, numero],
-  );
+  const nota: NotaData = useMemo(() => ({ ...(form ? paraEntrada(form) : notaPadrao()), numero }), [form, numero]);
   const primitivas = useLayoutNota(nota);
 
   const mostrarAviso = useCallback((a: Aviso) => {
@@ -82,6 +79,7 @@ export function NovaNota({ inicial }: Props) {
     const guardada = registo && !sujo ? registo : registo ? await apiAtualizar(registo.id, entrada) : await apiCriar(entrada);
     flushSync(() => {
       setRegisto(guardada);
+      setForm(paraFormulario(guardada));
       setSujo(false);
     });
     if (!registo) limparRascunho();
@@ -135,17 +133,13 @@ export function NovaNota({ inicial }: Props) {
         </span>
       </div>
       {registo ? (
-        <span className="rounded-full bg-laranja-claro px-2.5 py-1 text-[11px] font-semibold text-laranja-escuro">
-          Registada
-        </span>
+        <span className="rounded-full bg-laranja-claro px-2.5 py-1 text-[11px] font-semibold text-laranja-escuro">Registada</span>
       ) : erroProximo ? (
         <button className="botao-secundario px-3 py-1.5 text-xs" onClick={carregarProximo}>
           Tentar de novo
         </button>
       ) : (
-        <span className="rounded-full bg-amarelo-claro px-2.5 py-1 text-[11px] font-semibold text-laranja-escuro">
-          Automático
-        </span>
+        <span className="rounded-full bg-amarelo-claro px-2.5 py-1 text-[11px] font-semibold text-laranja-escuro">Automático</span>
       )}
     </div>
   );
@@ -157,22 +151,12 @@ export function NovaNota({ inicial }: Props) {
         {ocupado === "pdf" ? "A gerar…" : registo && !sujo ? "Descarregar PDF" : "Guardar e gerar PDF"}
       </button>
       {podePartilhar && (
-        <button
-          className="botao-secundario"
-          onClick={() => executar("partilhar")}
-          disabled={!!ocupado || !form}
-          aria-label="Partilhar PDF"
-        >
+        <button className="botao-secundario" onClick={() => executar("partilhar")} disabled={!!ocupado || !form} aria-label="Partilhar PDF">
           <IconePartilhar />
           <span className="hidden sm:inline">Partilhar</span>
         </button>
       )}
-      <button
-        className="botao-secundario"
-        onClick={() => executar("imprimir")}
-        disabled={!!ocupado || !form}
-        aria-label="Imprimir"
-      >
+      <button className="botao-secundario" onClick={() => executar("imprimir")} disabled={!!ocupado || !form} aria-label="Imprimir">
         <IconeImprimir />
         <span className="hidden sm:inline">Imprimir</span>
       </button>
@@ -184,7 +168,7 @@ export function NovaNota({ inicial }: Props) {
       <div className="no-print">
         <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">{registo ? `Nota N.º ${registo.numero}` : "Nova nota"}</h1>
+            <h1 className="text-2xl font-bold tracking-tight">{registo ? `Nota N.º ${registo.numero}` : "Nova nota de saída"}</h1>
             <p className="mt-1 text-sm text-tinta-suave">
               {registo
                 ? "A editar uma nota já registada. As alterações são guardadas ao gerar o PDF ou imprimir."
@@ -221,7 +205,7 @@ export function NovaNota({ inicial }: Props) {
           </div>
         )}
 
-        <div className="lg:grid lg:grid-cols-[minmax(0,26rem)_minmax(0,1fr)] lg:items-start lg:gap-8">
+        <div className="lg:grid lg:grid-cols-[minmax(0,27rem)_minmax(0,1fr)] lg:items-start lg:gap-8">
           <section className="rounded-3xl border border-linha bg-white p-5 shadow-suave sm:p-6">
             {form ? (
               <NotaForm valores={form} onChange={alterar} cabecalho={cabecalhoNumero} />
@@ -243,9 +227,7 @@ export function NovaNota({ inicial }: Props) {
             <div className="overflow-hidden rounded-2xl border border-linha bg-white shadow-suave ring-1 ring-tinta/5">
               <NotaSvg primitivas={primitivas} className="block h-auto w-full" />
             </div>
-            <p className="mt-2 text-center text-[11px] text-tinta-suave">
-              Página A4 · o PDF e a impressão são idênticos a esta pré-visualização.
-            </p>
+            <p className="mt-2 text-center text-[11px] text-tinta-suave">Página A4 · o PDF e a impressão são idênticos a esta pré-visualização.</p>
           </section>
         </div>
 

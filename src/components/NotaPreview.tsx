@@ -34,7 +34,7 @@ export function NotaSvg({ primitivas, className }: { primitivas: Primitive[]; cl
       xmlSpace="preserve"
       className={className}
       role="img"
-      aria-label="Pré-visualização da nota de pagamento"
+      aria-label="Pré-visualização da nota de saída de caixa"
     >
       <rect x="0" y="0" width={PAGE.w} height={PAGE.h} fill="#ffffff" />
       {primitivas.map((p, i) => {

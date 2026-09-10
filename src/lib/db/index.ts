@@ -19,23 +19,40 @@ export interface Db {
 }
 
 const SCHEMA = `
-CREATE TABLE IF NOT EXISTS notas (
+CREATE TABLE IF NOT EXISTS saidas (
   id TEXT PRIMARY KEY,
   numero INTEGER NOT NULL UNIQUE,
-  nome TEXT NOT NULL DEFAULT '',
-  motivo TEXT NOT NULL DEFAULT '',
+  beneficiario TEXT NOT NULL DEFAULT '',
+  origem TEXT NOT NULL DEFAULT '',
   periodo TEXT NOT NULL DEFAULT '',
-  remuneracao NUMERIC(14,2) NOT NULL DEFAULT 0,
-  taxa_remuneracao TEXT NOT NULL DEFAULT '',
-  desconto NUMERIC(14,2) NOT NULL DEFAULT 0,
-  taxa_desconto TEXT NOT NULL DEFAULT '',
+  itens JSONB NOT NULL DEFAULT '[]'::jsonb,
+  total NUMERIC(14,2) NOT NULL DEFAULT 0,
   cidade TEXT NOT NULL DEFAULT 'Luanda',
   data DATE NOT NULL,
   criada_em TIMESTAMPTZ NOT NULL DEFAULT now(),
   atualizada_em TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-CREATE INDEX IF NOT EXISTS notas_data_idx ON notas (data);
-CREATE INDEX IF NOT EXISTS notas_nome_idx ON notas (lower(nome));
+CREATE INDEX IF NOT EXISTS saidas_data_idx ON saidas (data);
+CREATE INDEX IF NOT EXISTS saidas_beneficiario_idx ON saidas (lower(beneficiario));
+`;
+
+/** Migra notas da versão anterior (tabela "notas") para "saidas", mantendo os números. */
+const MIGRACAO_LEGADO = `
+DO $$
+BEGIN
+  IF to_regclass('public.notas') IS NOT NULL THEN
+    INSERT INTO saidas (id, numero, beneficiario, origem, periodo, itens, total, cidade, data, criada_em, atualizada_em)
+    SELECT n.id, n.numero, n.nome, n.motivo, n.periodo,
+           jsonb_build_array(
+             jsonb_build_object('descricao', 'Remuneração de referência', 'qtd', '', 'valor', n.remuneracao),
+             jsonb_build_object('descricao', 'Desconto para a Segurança Social', 'qtd', n.taxa_desconto, 'valor', -n.desconto)
+           ),
+           n.remuneracao - n.desconto, n.cidade, n.data, n.criada_em, n.atualizada_em
+    FROM notas n
+    WHERE NOT EXISTS (SELECT 1 FROM saidas s WHERE s.id = n.id OR s.numero = n.numero);
+    ALTER TABLE notas RENAME TO notas_legado;
+  END IF;
+END $$;
 `;
 
 export function urlDaBaseDeDados(): string | undefined {
@@ -56,7 +73,7 @@ async function ligarPostgres(url: string): Promise<Db> {
     max: 3,
     idle_timeout: 20,
     connect_timeout: 15,
-    prepare: false, // compatível com poolers (pgbouncer / Supabase)
+    prepare: false, // compatível com poolers (pgbouncer / Supabase / Neon pooler)
   });
   return {
     async query<T extends Row>(text: string, params: unknown[] = []) {
@@ -87,20 +104,23 @@ async function ligarPglite(): Promise<Db> {
   };
 }
 
-let dbPromise: Promise<Db> | null = null;
+// Guardado em globalThis para ser partilhado por todos os módulos do processo
+// (o Next.js pode carregar páginas e rotas de API como instâncias separadas do módulo).
+const global = globalThis as unknown as { __nawanotasDb?: Promise<Db> | null };
 
 /** Devolve a ligação (partilhada) à base de dados, criando o esquema na primeira utilização. */
 export function getDb(): Promise<Db> {
-  if (!dbPromise) {
-    dbPromise = (async () => {
+  if (!global.__nawanotasDb) {
+    global.__nawanotasDb = (async () => {
       const url = urlDaBaseDeDados();
       const db = url ? await ligarPostgres(url) : await ligarPglite();
       await db.exec(SCHEMA);
+      await db.exec(MIGRACAO_LEGADO);
       return db;
     })().catch((e) => {
-      dbPromise = null;
+      global.__nawanotasDb = null;
       throw e;
     });
   }
-  return dbPromise;
+  return global.__nawanotasDb;
 }

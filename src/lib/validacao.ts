@@ -1,4 +1,4 @@
-import { partesData, type NotaEntrada } from "./nota";
+import { type ItemSaida, MAX_ITENS, type NotaEntrada, partesData } from "./nota";
 
 type Resultado = { ok: true; valor: NotaEntrada } | { ok: false; erro: string };
 
@@ -23,21 +23,28 @@ export function validarEntrada(body: unknown): Resultado {
   const d = new Date(Date.UTC(p.ano, p.mes - 1, p.dia));
   if (d.getUTCMonth() !== p.mes - 1 || d.getUTCDate() !== p.dia) return { ok: false, erro: "Data inexistente." };
 
-  const remuneracao = numero(b.remuneracao ?? 0);
-  const desconto = numero(b.desconto ?? 0);
-  if (remuneracao === null) return { ok: false, erro: "Remuneração inválida." };
-  if (desconto === null) return { ok: false, erro: "Desconto inválido." };
+  if (!Array.isArray(b.itens)) return { ok: false, erro: "Lista de itens inválida." };
+  const itens: ItemSaida[] = [];
+  for (const raw of b.itens) {
+    if (!raw || typeof raw !== "object") continue;
+    const i = raw as Record<string, unknown>;
+    const descricao = texto(i.descricao, 120);
+    const qtd = texto(i.qtd, 20);
+    const valor = numero(i.valor ?? 0);
+    if (valor === null) return { ok: false, erro: `Valor inválido no item "${descricao || "sem descrição"}".` };
+    if (!descricao && !valor) continue; // linha vazia
+    itens.push({ descricao, qtd, valor });
+  }
+  if (itens.length === 0) return { ok: false, erro: "Adicione pelo menos um item com descrição e valor." };
+  if (itens.length > MAX_ITENS) return { ok: false, erro: `Máximo de ${MAX_ITENS} itens por nota.` };
 
   return {
     ok: true,
     valor: {
-      nome: texto(b.nome),
-      motivo: texto(b.motivo),
+      beneficiario: texto(b.beneficiario),
+      origem: texto(b.origem, 80),
       periodo: texto(b.periodo),
-      remuneracao,
-      taxaRemuneracao: texto(b.taxaRemuneracao, 40),
-      desconto,
-      taxaDesconto: texto(b.taxaDesconto, 40),
+      itens,
       cidade: texto(b.cidade, 80) || "Luanda",
       data,
     },

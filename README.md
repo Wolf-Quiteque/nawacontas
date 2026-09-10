@@ -1,11 +1,12 @@
 # NawaNotas
 
-Aplicação web progressiva (PWA) para emitir e registar **Notas de Pagamento NawaBus**.
-Cada nota recebe automaticamente um número sequencial, fica guardada na base de dados e pode
-ser consultada, filtrada por data, reimpressa ou editada mais tarde no **Histórico**.
+Aplicação web progressiva (PWA) para emitir e registar **Notas de Saída de Caixa NawaBus**.
+Serve para qualquer saída de dinheiro: indica-se o beneficiário (quem recebe), a origem do dinheiro
+(caixa, cartão, transferência…), a lista de itens com os valores, e a app gera o PDF, imprime e regista
+a nota com um número sequencial. Tudo fica consultável no **Histórico**, com filtros por data.
 
-O documento gerado reproduz fielmente o modelo original (`Nota_de_Pagamento_..._NawaBus_issac.pdf`):
-todas as posições, tamanhos de letra, cores e tabelas foram medidos no PDF original e estão em
+O documento segue o modelo gráfico original (`Nota_de_Pagamento_..._NawaBus_issac.pdf`): as posições,
+tamanhos de letra, cores e tabelas foram medidos no PDF original e estão em
 [`src/lib/layout.ts`](src/lib/layout.ts). O PDF (pdf-lib) e a pré-visualização/impressão (SVG) usam
 exatamente o mesmo layout.
 
@@ -13,14 +14,14 @@ exatamente o mesmo layout.
 
 - **Numeração automática e sequencial.** A primeira nota registada é a N.º 36 (as 35 anteriores
   foram emitidas antes da app). O número é atribuído pelo servidor ao guardar, sem duplicados.
-- **Histórico** com pesquisa (nome, motivo, período ou número), intervalo de datas e atalhos
-  (hoje, mês atual, mês passado, ano). Mostra o total líquido das notas filtradas.
+- **Lista de itens** (até 12 por nota) com descrição, quantidade opcional e valor; total e
+  **valor por extenso** (português, kwanzas) calculados automaticamente.
+- **Histórico** com pesquisa (beneficiário, origem, item ou número), intervalo de datas e atalhos
+  (hoje, mês atual, mês passado, ano). Mostra o total das notas filtradas.
 - **Reimprimir / descarregar / partilhar** qualquer nota antiga; **editar** mantendo o número; eliminar.
 - Data de hoje preenchida automaticamente (pode ser alterada); o ano no número segue a data.
-- Valor líquido e **valor por extenso** (português, kwanzas) calculados automaticamente.
-- Se a taxa do desconto for uma percentagem (ex.: `3%`), o desconto é calculado a partir da remuneração.
 - Rascunho da nota nova guardado automaticamente no dispositivo.
-- PWA instalável (iPhone, Android, computador) com menu lateral / gaveta.
+- PWA instalável (iPhone, Android, computador) com menu lateral / gaveta e ajuda de instalação.
 
 ## Base de dados
 
@@ -30,12 +31,11 @@ A app usa **Postgres**. Em produção lê a ligação destas variáveis de ambie
 POSTGRES_URL, DATABASE_URL, POSTGRES_PRISMA_URL, POSTGRES_URL_NON_POOLING
 ```
 
-Estas são exatamente as variáveis que as integrações de base de dados do Vercel (Neon, Supabase,
-Vercel Postgres) criam automaticamente no projeto. A tabela `notas` é criada na primeira utilização;
-não é preciso correr migrações.
+Estas são exatamente as variáveis que a integração Neon/Vercel Postgres cria automaticamente no projeto.
+A tabela `saidas` é criada na primeira utilização; não é preciso correr migrações.
 
-Sem nenhuma destas variáveis (por exemplo em desenvolvimento local) a app usa um Postgres embebido
-(PGlite) guardado na pasta `.data/`, que não é enviada para o git.
+Sem nenhuma destas variáveis (por exemplo em desenvolvimento local sem `.env`) a app usa um Postgres
+embebido (PGlite) guardado na pasta `.data/`, que não é enviada para o git.
 
 Variáveis opcionais:
 
@@ -48,10 +48,11 @@ Variáveis opcionais:
 
 ```bash
 npm install
-npm run dev        # desenvolvimento em http://localhost:3000 (Postgres embebido em .data/)
+npm run dev        # desenvolvimento em http://localhost:3000
 npm run build      # build de produção
 npm start          # servir a build
-npm run test:db    # testa a camada de dados (numeração, filtros, edição, eliminação)
+npm run check:db   # testa a ligação à base de dados do .env (não altera dados)
+npm run test:db    # testa a camada de dados num Postgres embebido temporário
 npm run test:pdf   # gera um PDF de exemplo
 ```
 
@@ -61,12 +62,17 @@ npm run test:pdf   # gera um PDF de exemplo
 2. Ligar a base de dados ao projeto em **Storage** (a integração cria `POSTGRES_URL`/`DATABASE_URL`).
 3. Deploy. Na primeira chamada a tabela é criada automaticamente.
 
-### Instalar no iPhone
+## Instalar como app
 
-1. Abrir o site no **Safari**.
-2. Tocar em **Partilhar** e depois em **Adicionar ao ecrã principal**.
+O menu **Instalar app** (barra lateral / gaveta) mostra as instruções para o dispositivo em uso.
 
-No Android e no Chrome/Edge de computador aparece o botão **Instalar**.
+- **iPhone / iPad:** abrir no **Safari** → **Partilhar** → **Adicionar ao ecrã principal**.
+- **Android:** Chrome → menu ⋮ → **Instalar app**.
+- **Computador (Chrome/Edge):** ícone de instalação na barra de endereço, ou menu ⋮ →
+  *Transmitir, guardar e partilhar* → *Instalar página como app*.
+
+A instalação exige HTTPS (o Vercel já o fornece) e o service worker ativo — na primeira visita pode
+ser necessário recarregar a página uma vez.
 
 ## Estrutura
 
@@ -75,12 +81,13 @@ No Android e no Chrome/Edge de computador aparece o botão **Instalar**.
 | `src/lib/layout.ts` | Layout da nota em pontos (partilhado por PDF e pré-visualização) |
 | `src/lib/pdf.ts` | Geração do PDF com pdf-lib (Helvetica, métricas idênticas à Arial) |
 | `src/lib/extenso.ts` | Números por extenso em português |
-| `src/lib/nota.ts` | Tipos, formatação de valores e datas |
-| `src/lib/db/index.ts` | Ligação à base de dados (Postgres ou PGlite) e esquema |
+| `src/lib/nota.ts` | Tipos, formatação de valores e datas, textos do documento |
+| `src/lib/db/index.ts` | Ligação à base de dados (Postgres ou PGlite), esquema e migração |
 | `src/lib/db/notas.ts` | Operações sobre as notas (listar, criar com número sequencial, editar, eliminar) |
 | `src/lib/validacao.ts` | Validação dos dados recebidos pela API |
+| `src/lib/pwa.ts` | Estado da instalação (evento de instalação, service worker) |
 | `src/app/api/notas/*` | API REST (`GET/POST /api/notas`, `GET/PUT/DELETE /api/notas/[id]`, `GET /api/notas/proximo`) |
 | `src/app/` | Páginas: nova nota (`/`), histórico (`/historico`), ver (`/notas/[id]`), editar (`/notas/[id]/editar`) |
-| `src/components/` | Menu lateral, formulário, pré-visualização SVG, histórico, registo da PWA |
+| `src/components/` | Menu lateral, formulário com itens, pré-visualização SVG, histórico, instalação da PWA |
 | `public/sw.js` | Service worker |
-| `scripts/` | Geração de ícones e testes |
+| `scripts/` | Geração de ícones, verificação da base de dados e testes |

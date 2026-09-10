@@ -5,7 +5,7 @@ import { Shell } from "@/components/Shell";
 
 export const metadata: Metadata = {
   title: "NawaNotas",
-  description: "Gerador e registo de notas de pagamento NawaBus — preencha os dados e obtenha o PDF.",
+  description: "Notas de saída de caixa NawaBus — emitir, registar e reimprimir em PDF.",
   applicationName: "NawaNotas",
   manifest: "/manifest.webmanifest",
   appleWebApp: {

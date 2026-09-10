@@ -30,7 +30,7 @@ export async function partilharPdf(nota: NotaData): Promise<boolean> {
   const bytes = await gerarPdf(nota);
   const ficheiro = new File([bytes as BlobPart], nomeFicheiro(nota), { type: "application/pdf" });
   try {
-    await navigator.share({ files: [ficheiro], title: `Nota de Pagamento N.º ${nota.numero}` });
+    await navigator.share({ files: [ficheiro], title: `Nota de Saída de Caixa N.º ${nota.numero}` });
     return true;
   } catch (e) {
     if (e instanceof DOMException && e.name === "AbortError") return false;
