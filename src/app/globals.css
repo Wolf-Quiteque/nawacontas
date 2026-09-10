@@ -1,0 +1,89 @@
+@import "tailwindcss";
+
+@theme {
+  --color-creme: #fff8ee;
+  --color-creme-escuro: #fdefdc;
+  --color-laranja: #f28c1b;
+  --color-laranja-escuro: #d9730a;
+  --color-laranja-claro: #fff0e1;
+  --color-amarelo: #ffc533;
+  --color-amarelo-claro: #fff4cf;
+  --color-tinta: #1f1a14;
+  --color-tinta-suave: #7a6a56;
+  --color-linha: #f1e3cf;
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, "Helvetica Neue", Arial,
+    sans-serif;
+  --shadow-suave: 0 1px 2px rgb(31 26 20 / 0.04), 0 8px 24px -12px rgb(217 115 10 / 0.25);
+  --radius-xl2: 1.25rem;
+}
+
+html {
+  color-scheme: light;
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  background: var(--color-creme);
+  color: var(--color-tinta);
+  font-family: var(--font-sans);
+  min-height: 100dvh;
+}
+
+/* Campos de formulário */
+.campo {
+  @apply w-full rounded-xl border border-linha bg-white px-3.5 py-2.5 text-[16px] text-tinta shadow-none outline-none transition;
+  @apply placeholder:text-tinta-suave/50 focus:border-laranja focus:ring-4 focus:ring-laranja/15;
+}
+.rotulo {
+  @apply mb-1.5 block text-[13px] font-medium text-tinta-suave;
+}
+.botao,
+.botao-primario,
+.botao-secundario,
+.botao-fantasma {
+  @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition select-none;
+  @apply active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50;
+}
+.botao-primario {
+  @apply bg-laranja text-white shadow-suave hover:bg-laranja-escuro;
+}
+.botao-secundario {
+  @apply border border-linha bg-white text-tinta hover:border-laranja/50 hover:bg-laranja-claro/60;
+}
+.botao-fantasma {
+  @apply text-tinta-suave hover:bg-laranja-claro/70 hover:text-tinta;
+}
+
+/* Impressão: apenas a nota, em A4 sem margens */
+@page {
+  size: A4;
+  margin: 0;
+}
+#print-area {
+  display: none;
+}
+@media print {
+  html,
+  body {
+    background: #fff !important;
+    margin: 0 !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+  #print-area {
+    display: block !important;
+    position: fixed;
+    inset: 0;
+    width: 210mm;
+    height: 297mm;
+    background: #fff;
+  }
+  #print-area svg {
+    display: block;
+    width: 210mm;
+    height: 297mm;
+  }
+}
