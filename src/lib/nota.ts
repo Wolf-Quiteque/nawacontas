@@ -20,10 +20,30 @@ export interface NotaData {
   data: string;
 }
 
-/** Nota guardada no histórico. */
-export interface NotaGuardada extends NotaData {
+/** Dados enviados para a base de dados (o número é atribuído pelo servidor). */
+export type NotaEntrada = Omit<NotaData, "numero">;
+
+/** Nota registada na base de dados. */
+export interface NotaRegisto extends NotaEntrada {
   id: string;
+  numero: number;
   criadaEm: string;
+  atualizadaEm: string;
+}
+
+export function registoParaNota(r: NotaRegisto): NotaData {
+  return {
+    numero: String(r.numero),
+    nome: r.nome,
+    motivo: r.motivo,
+    periodo: r.periodo,
+    remuneracao: Number(r.remuneracao) || 0,
+    taxaRemuneracao: r.taxaRemuneracao,
+    desconto: Number(r.desconto) || 0,
+    taxaDesconto: r.taxaDesconto,
+    cidade: r.cidade,
+    data: r.data,
+  };
 }
 
 export const MESES = [

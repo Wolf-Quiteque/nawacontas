@@ -1,11 +1,10 @@
 "use client";
 
 import { kwanzasPorExtenso } from "@/lib/extenso";
-import { formatarKz, type NotaData, valorLiquido } from "@/lib/nota";
+import { formatarKz, type NotaEntrada, valorLiquido } from "@/lib/nota";
 
 /** Valores do formulário (números como texto para edição livre). */
 export interface Formulario {
-  numero: string;
   nome: string;
   motivo: string;
   periodo: string;
@@ -23,24 +22,22 @@ export function numeroDe(texto: string): number {
   return Number.isFinite(v) ? v : 0;
 }
 
-export function paraFormulario(n: NotaData): Formulario {
+export function paraFormulario(n: NotaEntrada): Formulario {
   return {
-    numero: n.numero,
-    nome: n.nome,
+    nome: n.nome ?? "",
     motivo: n.motivo ?? "",
-    periodo: n.periodo,
+    periodo: n.periodo ?? "",
     remuneracao: n.remuneracao ? String(n.remuneracao) : "",
-    taxaRemuneracao: n.taxaRemuneracao,
+    taxaRemuneracao: n.taxaRemuneracao ?? "",
     desconto: n.desconto ? String(n.desconto) : "",
-    taxaDesconto: n.taxaDesconto,
-    cidade: n.cidade,
+    taxaDesconto: n.taxaDesconto ?? "",
+    cidade: n.cidade ?? "Luanda",
     data: n.data,
   };
 }
 
-export function paraNota(f: Formulario): NotaData {
+export function paraEntrada(f: Formulario): NotaEntrada {
   return {
-    numero: f.numero,
     nome: f.nome,
     motivo: f.motivo,
     periodo: f.periodo,
@@ -63,11 +60,13 @@ function percentagemDe(taxa: string): number | null {
 interface Props {
   valores: Formulario;
   onChange: (valores: Formulario) => void;
+  /** Cabeçalho com o número da nota (atribuído pelo servidor). */
+  cabecalho?: React.ReactNode;
 }
 
-export function NotaForm({ valores, onChange }: Props) {
-  const nota = paraNota(valores);
-  const liquido = valorLiquido(nota);
+export function NotaForm({ valores, onChange, cabecalho }: Props) {
+  const entrada = paraEntrada(valores);
+  const liquido = valorLiquido(entrada);
 
   const set = (campo: keyof Formulario, valor: string) => {
     const novo = { ...valores, [campo]: valor };
@@ -90,20 +89,8 @@ export function NotaForm({ valores, onChange }: Props) {
       aria-label="Dados da nota de pagamento"
     >
       <Seccao titulo="Documento" descricao="Número, data e local que aparecem na nota.">
-        <div className="grid grid-cols-[6rem_1fr] gap-3">
-          <div>
-            <label className="rotulo" htmlFor="numero">
-              N.º
-            </label>
-            <input
-              id="numero"
-              className="campo"
-              inputMode="numeric"
-              value={valores.numero}
-              onChange={(e) => set("numero", e.target.value)}
-              placeholder="18"
-            />
-          </div>
+        {cabecalho}
+        <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="rotulo" htmlFor="data">
               Data
@@ -117,7 +104,7 @@ export function NotaForm({ valores, onChange }: Props) {
               required
             />
           </div>
-          <div className="col-span-2">
+          <div>
             <label className="rotulo" htmlFor="cidade">
               Local
             </label>

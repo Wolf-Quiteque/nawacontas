@@ -1,27 +1,65 @@
 # NawaNotas
 
-Aplicação web progressiva (PWA) para gerar **Notas de Pagamento NawaBus** em PDF.
-Preenche-se o formulário, a nota aparece em pré-visualização e pode ser descarregada em PDF,
-partilhada (iPhone/Android) ou impressa. Funciona offline depois da primeira visita e pode ser
-instalada no iPhone, Android e computador.
+Aplicação web progressiva (PWA) para emitir e registar **Notas de Pagamento NawaBus**.
+Cada nota recebe automaticamente um número sequencial, fica guardada na base de dados e pode
+ser consultada, filtrada por data, reimpressa ou editada mais tarde no **Histórico**.
 
 O documento gerado reproduz fielmente o modelo original (`Nota_de_Pagamento_..._NawaBus_issac.pdf`):
 todas as posições, tamanhos de letra, cores e tabelas foram medidos no PDF original e estão em
 [`src/lib/layout.ts`](src/lib/layout.ts). O PDF (pdf-lib) e a pré-visualização/impressão (SVG) usam
 exatamente o mesmo layout.
 
+## Funcionalidades
+
+- **Numeração automática e sequencial.** A primeira nota registada é a N.º 36 (as 35 anteriores
+  foram emitidas antes da app). O número é atribuído pelo servidor ao guardar, sem duplicados.
+- **Histórico** com pesquisa (nome, motivo, período ou número), intervalo de datas e atalhos
+  (hoje, mês atual, mês passado, ano). Mostra o total líquido das notas filtradas.
+- **Reimprimir / descarregar / partilhar** qualquer nota antiga; **editar** mantendo o número; eliminar.
+- Data de hoje preenchida automaticamente (pode ser alterada); o ano no número segue a data.
+- Valor líquido e **valor por extenso** (português, kwanzas) calculados automaticamente.
+- Se a taxa do desconto for uma percentagem (ex.: `3%`), o desconto é calculado a partir da remuneração.
+- Rascunho da nota nova guardado automaticamente no dispositivo.
+- PWA instalável (iPhone, Android, computador) com menu lateral / gaveta.
+
+## Base de dados
+
+A app usa **Postgres**. Em produção lê a ligação destas variáveis de ambiente (a primeira que existir):
+
+```
+POSTGRES_URL, DATABASE_URL, POSTGRES_PRISMA_URL, POSTGRES_URL_NON_POOLING
+```
+
+Estas são exatamente as variáveis que as integrações de base de dados do Vercel (Neon, Supabase,
+Vercel Postgres) criam automaticamente no projeto. A tabela `notas` é criada na primeira utilização;
+não é preciso correr migrações.
+
+Sem nenhuma destas variáveis (por exemplo em desenvolvimento local) a app usa um Postgres embebido
+(PGlite) guardado na pasta `.data/`, que não é enviada para o git.
+
+Variáveis opcionais:
+
+| Variável | Predefinição | Descrição |
+| --- | --- | --- |
+| `NOTAS_NUMERO_INICIAL` | `35` | Último número já emitido antes da app; a próxima nota recebe este valor + 1 |
+| `PGLITE_DIR` | `.data/nawanotas` | Pasta do Postgres embebido (apenas sem base de dados externa) |
+
 ## Utilização
 
 ```bash
 npm install
-npm run dev        # desenvolvimento em http://localhost:3000
-npm run build      # exportação estática para a pasta out/
-npx serve out      # servir a versão de produção localmente
+npm run dev        # desenvolvimento em http://localhost:3000 (Postgres embebido em .data/)
+npm run build      # build de produção
+npm start          # servir a build
+npm run test:db    # testa a camada de dados (numeração, filtros, edição, eliminação)
+npm run test:pdf   # gera um PDF de exemplo
 ```
 
-Para testar a instalação como PWA (service worker) é preciso usar a versão de produção
-(`npm run build` + `npx serve out`) ou publicar a pasta `out/` num alojamento com HTTPS
-(Vercel, Netlify, Cloudflare Pages, GitHub Pages, etc.).
+## Publicar no Vercel
+
+1. Importar o repositório no Vercel (raiz do projeto = raiz do repositório).
+2. Ligar a base de dados ao projeto em **Storage** (a integração cria `POSTGRES_URL`/`DATABASE_URL`).
+3. Deploy. Na primeira chamada a tabela é criada automaticamente.
 
 ### Instalar no iPhone
 
@@ -29,16 +67,6 @@ Para testar a instalação como PWA (service worker) é preciso usar a versão d
 2. Tocar em **Partilhar** e depois em **Adicionar ao ecrã principal**.
 
 No Android e no Chrome/Edge de computador aparece o botão **Instalar**.
-
-## Funcionalidades
-
-- Data de hoje preenchida automaticamente (pode ser alterada); o ano do número da nota segue a data.
-- Número da nota sugerido automaticamente a partir do histórico.
-- Valor líquido e **valor por extenso** (português, kwanzas) calculados automaticamente.
-- Se a taxa do desconto for uma percentagem (ex.: `3%`), o desconto é calculado a partir da remuneração.
-- Histórico das notas geradas guardado no dispositivo (localStorage).
-- Rascunho guardado automaticamente.
-- Descarregar PDF, Partilhar (share sheet do iOS/Android) e Imprimir (A4, sem margens).
 
 ## Estrutura
 
@@ -48,9 +76,11 @@ No Android e no Chrome/Edge de computador aparece o botão **Instalar**.
 | `src/lib/pdf.ts` | Geração do PDF com pdf-lib (Helvetica, métricas idênticas à Arial) |
 | `src/lib/extenso.ts` | Números por extenso em português |
 | `src/lib/nota.ts` | Tipos, formatação de valores e datas |
-| `src/lib/armazenamento.ts` | Rascunho e histórico em localStorage |
-| `src/components/` | Formulário, pré-visualização SVG, histórico, registo da PWA |
-| `public/sw.js` | Service worker (offline) |
-| `src/app/manifest.ts` | Manifesto da PWA |
-| `scripts/icons.mjs` | Gera os ícones (`npm run icons`) |
-| `scripts/test-pdf.ts` | Gera um PDF de teste (`npm run test:pdf`) |
+| `src/lib/db/index.ts` | Ligação à base de dados (Postgres ou PGlite) e esquema |
+| `src/lib/db/notas.ts` | Operações sobre as notas (listar, criar com número sequencial, editar, eliminar) |
+| `src/lib/validacao.ts` | Validação dos dados recebidos pela API |
+| `src/app/api/notas/*` | API REST (`GET/POST /api/notas`, `GET/PUT/DELETE /api/notas/[id]`, `GET /api/notas/proximo`) |
+| `src/app/` | Páginas: nova nota (`/`), histórico (`/historico`), ver (`/notas/[id]`), editar (`/notas/[id]/editar`) |
+| `src/components/` | Menu lateral, formulário, pré-visualização SVG, histórico, registo da PWA |
+| `public/sw.js` | Service worker |
+| `scripts/` | Geração de ícones e testes |

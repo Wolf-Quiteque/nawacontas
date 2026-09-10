@@ -1,5 +1,5 @@
-import { App } from "@/components/App";
+import { NovaNota } from "@/components/NovaNota";
 
 export default function Page() {
-  return <App />;
+  return <NovaNota />;
 }

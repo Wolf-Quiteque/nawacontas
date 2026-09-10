@@ -8,13 +8,17 @@
     "start": "next start",
     "lint": "eslint",
     "icons": "node scripts/icons.mjs",
-    "test:pdf": "tsx scripts/test-pdf.ts out-teste.pdf"
+    "test:pdf": "tsx scripts/test-pdf.ts out-teste.pdf",
+    "test:db": "tsx --conditions react-server scripts/test-db.ts"
   },
   "dependencies": {
+    "@electric-sql/pglite": "^0.5.8",
     "next": "16.3.4",
     "pdf-lib": "^1.17.1",
+    "postgres": "^3.4.9",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "server-only": "^0.0.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

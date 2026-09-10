@@ -31,29 +31,31 @@ body {
   min-height: 100dvh;
 }
 
-/* Campos de formulário */
-.campo {
-  @apply w-full rounded-xl border border-linha bg-white px-3.5 py-2.5 text-[16px] text-tinta shadow-none outline-none transition;
-  @apply placeholder:text-tinta-suave/50 focus:border-laranja focus:ring-4 focus:ring-laranja/15;
-}
-.rotulo {
-  @apply mb-1.5 block text-[13px] font-medium text-tinta-suave;
-}
-.botao,
-.botao-primario,
-.botao-secundario,
-.botao-fantasma {
-  @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition select-none;
-  @apply active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50;
-}
-.botao-primario {
-  @apply bg-laranja text-white shadow-suave hover:bg-laranja-escuro;
-}
-.botao-secundario {
-  @apply border border-linha bg-white text-tinta hover:border-laranja/50 hover:bg-laranja-claro/60;
-}
-.botao-fantasma {
-  @apply text-tinta-suave hover:bg-laranja-claro/70 hover:text-tinta;
+/* Campos de formulário e botões (em @layer components para que as utilities os possam sobrepor) */
+@layer components {
+  .campo {
+    @apply w-full rounded-xl border border-linha bg-white px-3.5 py-2.5 text-[16px] text-tinta shadow-none outline-none transition;
+    @apply placeholder:text-tinta-suave/50 focus:border-laranja focus:ring-4 focus:ring-laranja/15;
+  }
+  .rotulo {
+    @apply mb-1.5 block text-[13px] font-medium text-tinta-suave;
+  }
+  .botao,
+  .botao-primario,
+  .botao-secundario,
+  .botao-fantasma {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition select-none;
+    @apply active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .botao-primario {
+    @apply bg-laranja text-white shadow-suave hover:bg-laranja-escuro;
+  }
+  .botao-secundario {
+    @apply border border-linha bg-white text-tinta hover:border-laranja/50 hover:bg-laranja-claro/60;
+  }
+  .botao-fantasma {
+    @apply text-tinta-suave hover:bg-laranja-claro/70 hover:text-tinta;
+  }
 }
 
 /* Impressão: apenas a nota, em A4 sem margens */

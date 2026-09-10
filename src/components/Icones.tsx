@@ -84,3 +84,48 @@ export const IconeVerificado = (p: P) => (
     <path d="M20 6 9 17l-5-5" />
   </svg>
 );
+
+export const IconeMenu = (p: P) => (
+  <svg {...base(p)}>
+    <path d="M4 7h16" />
+    <path d="M4 12h16" />
+    <path d="M4 17h16" />
+  </svg>
+);
+
+export const IconeEditar = (p: P) => (
+  <svg {...base(p)}>
+    <path d="M12 20h9" />
+    <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+  </svg>
+);
+
+export const IconePesquisar = (p: P) => (
+  <svg {...base(p)}>
+    <circle cx="11" cy="11" r="7" />
+    <path d="m20 20-3.5-3.5" />
+  </svg>
+);
+
+export const IconeSeta = (p: P) => (
+  <svg {...base(p)}>
+    <path d="m9 6 6 6-6 6" />
+  </svg>
+);
+
+export const IconeAviso = (p: P) => (
+  <svg {...base(p)}>
+    <path d="M12 9v4" />
+    <path d="M12 17h.01" />
+    <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" />
+  </svg>
+);
+
+export const IconeDocumento = (p: P) => (
+  <svg {...base(p)}>
+    <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8Z" />
+    <path d="M14 3v5h5" />
+    <path d="M9 13h6" />
+    <path d="M9 17h4" />
+  </svg>
+);

@@ -42,3 +42,6 @@ next-env.d.ts
 
 # ficheiros de teste
 out-teste.pdf
+
+# base de dados local (PGlite)
+/.data

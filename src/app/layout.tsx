@@ -1,10 +1,11 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { PwaRegister } from "@/components/PwaRegister";
+import { Shell } from "@/components/Shell";
 
 export const metadata: Metadata = {
   title: "NawaNotas",
-  description: "Gerador de notas de pagamento NawaBus — preencha os dados e obtenha o PDF.",
+  description: "Gerador e registo de notas de pagamento NawaBus — preencha os dados e obtenha o PDF.",
   applicationName: "NawaNotas",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
@@ -26,8 +27,8 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="pt" className="h-full antialiased">
-      <body className="flex min-h-full flex-col">
-        {children}
+      <body className="min-h-full">
+        <Shell>{children}</Shell>
         <PwaRegister />
       </body>
     </html>
