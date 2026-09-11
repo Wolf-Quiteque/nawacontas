@@ -233,7 +233,7 @@ export function NovaNota() {
               <h2 id="confirmar-titulo" className="text-lg font-semibold">
                 Registar a nota N.º {numero || "…"}?
               </h2>
-              <p className="mt-1 text-sm text-tinta-suave">Depois de registada, a nota não pode ser editada nem eliminada.</p>
+              <p className="mt-1 text-sm text-tinta-suave">Depois de registada, a nota não pode ser editada; só um administrador a pode eliminar.</p>
               <dl className="mt-4 space-y-2 rounded-2xl bg-creme px-4 py-3 text-sm">
                 <div className="flex justify-between gap-3">
                   <dt className="text-tinta-suave">Beneficiário</dt>

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { IconeAviso, IconeInstalar } from "./Icones";
+import { IconeAviso, IconeInstalar, IconeVerificado } from "./Icones";
 import { InstalarModal } from "./InstalarModal";
 import { Marca } from "./Shell";
 import { digitosTelefone, formatarTelefone, normalizarTelefone } from "@/lib/telefone";
@@ -25,6 +25,8 @@ export function FormularioAuth({ modo, destino }: Props) {
   const [erro, setErro] = useState<string | null>(null);
   const [aEnviar, setAEnviar] = useState(false);
   const [instalar, setInstalar] = useState(false);
+  /** Conta criada: fica pendente até um administrador a aprovar. */
+  const [pedidoEnviado, setPedidoEnviado] = useState(false);
 
   const sufixo = destino !== "/" ? `?voltar=${encodeURIComponent(destino)}` : "";
 
@@ -52,6 +54,13 @@ export function FormularioAuth({ modo, destino }: Props) {
         setAEnviar(false);
         return;
       }
+      if (registar) {
+        setPedidoEnviado(true);
+        setSenha("");
+        setConfirmar("");
+        setAEnviar(false);
+        return;
+      }
       window.location.replace(destino);
     } catch {
       setErro("Sem ligação ao servidor. Verifique a internet e tente novamente.");
@@ -65,11 +74,26 @@ export function FormularioAuth({ modo, destino }: Props) {
         <Marca href={registar ? `/registar${sufixo}` : `/entrar${sufixo}`} />
       </div>
 
+      {pedidoEnviado ? (
+        <div className="rounded-3xl border border-linha bg-white p-6 text-center shadow-suave" role="status">
+          <span className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-laranja-claro text-laranja-escuro">
+            <IconeVerificado />
+          </span>
+          <h1 className="mt-3 text-xl font-bold tracking-tight">Pedido de acesso enviado</h1>
+          <p className="mt-2 text-sm text-tinta-suave">
+            A sua conta foi criada e aguarda a aprovação de um administrador. Poderá entrar com o seu número e palavra-passe assim
+            que for aprovada.
+          </p>
+          <Link href={`/entrar${sufixo}`} className="botao-primario mt-5 w-full">
+            Voltar à entrada
+          </Link>
+        </div>
+      ) : (
       <div className="rounded-3xl border border-linha bg-white p-6 shadow-suave">
         <h1 className="text-xl font-bold tracking-tight">{registar ? "Criar conta" : "Entrar"}</h1>
         <p className="mt-1 text-sm text-tinta-suave">
           {registar
-            ? "Registe-se com o seu número de telefone. O seu nome fica associado às notas que registar."
+            ? "Registe-se com o seu número de telefone. Um administrador tem de aprovar a conta antes de poder entrar."
             : "Use o seu número de telefone e a palavra-passe."}
         </p>
 
@@ -170,6 +194,7 @@ export function FormularioAuth({ modo, destino }: Props) {
           </Link>
         </p>
       </div>
+      )}
 
       <div className="mt-4 flex justify-center">
         <button className="botao-fantasma text-xs" onClick={() => setInstalar(true)}>

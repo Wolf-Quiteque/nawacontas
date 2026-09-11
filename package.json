@@ -10,7 +10,8 @@
     "icons": "node scripts/icons.mjs",
     "test:pdf": "tsx scripts/test-pdf.ts out-teste.pdf",
     "test:db": "tsx --conditions react-server scripts/test-db.ts",
-    "check:db": "tsx --conditions react-server scripts/check-db.ts"
+    "check:db": "tsx --conditions react-server scripts/check-db.ts",
+    "criar-admin": "tsx --conditions react-server scripts/criar-admin.ts"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.8",

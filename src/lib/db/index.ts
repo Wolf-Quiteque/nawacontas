@@ -61,6 +61,29 @@ BEGIN
     CREATE INDEX saidas_criado_por_idx ON saidas (criado_por);
   END IF;
 END $$;
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+     WHERE table_schema = current_schema() AND table_name = 'utilizadores' AND column_name = 'estado'
+  ) THEN
+    ALTER TABLE utilizadores ADD COLUMN estado TEXT NOT NULL DEFAULT 'pendente'
+      CHECK (estado IN ('pendente', 'aprovado', 'removido'));
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+     WHERE table_schema = current_schema() AND table_name = 'utilizadores' AND column_name = 'admin'
+  ) THEN
+    ALTER TABLE utilizadores ADD COLUMN admin BOOLEAN NOT NULL DEFAULT false;
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+     WHERE table_schema = current_schema() AND table_name = 'saidas' AND column_name = 'eliminada_em'
+  ) THEN
+    ALTER TABLE saidas ADD COLUMN eliminada_em TIMESTAMPTZ;
+    ALTER TABLE saidas ADD COLUMN eliminada_por TEXT REFERENCES utilizadores(id);
+  END IF;
+END $$;
 `;
 
 /**
@@ -107,6 +130,7 @@ async function ligarPostgres(url: string): Promise<Db> {
     idle_timeout: 20,
     connect_timeout: 15,
     prepare: false, // compatível com poolers (pgbouncer / Supabase / Neon pooler)
+    onnotice: () => {}, // ignora avisos como "relation already exists, skipping" ao aplicar o esquema
   });
   return {
     async query<T extends Row>(text: string, params: unknown[] = []) {

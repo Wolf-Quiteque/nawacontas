@@ -20,6 +20,17 @@ export async function exigirUtilizador(): Promise<Utilizador> {
   return utilizador;
 }
 
+/** Para páginas só de administradores: quem não é administrador volta à página inicial. */
+export async function exigirAdmin(): Promise<Utilizador> {
+  const utilizador = await exigirUtilizador();
+  if (!utilizador.admin) redirect("/");
+  return utilizador;
+}
+
 export function respostaNaoAutenticado() {
   return NextResponse.json({ erro: "Sessão expirada. Entre novamente." }, { status: 401 });
+}
+
+export function respostaProibido(mensagem = "Apenas administradores podem fazer esta operação.") {
+  return NextResponse.json({ erro: mensagem }, { status: 403 });
 }

@@ -19,17 +19,20 @@ export async function criarSessao(utilizadorId: string): Promise<string> {
   return token;
 }
 
-/** Devolve o utilizador de uma sessão válida, prolongando-a quando passou metade da validade. */
+/**
+ * Devolve o utilizador de uma sessão válida (só contas aprovadas), prolongando-a quando passou
+ * metade da validade. O papel de administrador é lido em cada pedido, por isso alterações têm efeito imediato.
+ */
 export async function utilizadorDoToken(token: string): Promise<Utilizador | null> {
   if (!token || token.length > 200) return null;
   const db = await getDb();
   const h = hashToken(token);
   const rows = await db.query<Utilizador & { renovar: boolean }>(
-    `SELECT u.id, u.nome, u.telefone,
+    `SELECT u.id, u.nome, u.telefone, u.admin,
             (s.expira_em < now() + make_interval(days => $2::int)) AS renovar
        FROM sessoes s
        JOIN utilizadores u ON u.id = s.utilizador_id
-      WHERE s.token_hash = $1 AND s.expira_em > now()`,
+      WHERE s.token_hash = $1 AND s.expira_em > now() AND u.estado = 'aprovado'`,
     [h, Math.floor(DURACAO_SESSAO_DIAS / 2)],
   );
   const r = rows[0];
@@ -40,10 +43,16 @@ export async function utilizadorDoToken(token: string): Promise<Utilizador | nul
       DURACAO_SESSAO_DIAS,
     ]);
   }
-  return { id: r.id, nome: r.nome, telefone: r.telefone };
+  return { id: r.id, nome: r.nome, telefone: r.telefone, admin: Boolean(r.admin) };
 }
 
 export async function terminarSessao(token: string): Promise<void> {
   const db = await getDb();
   await db.query(`DELETE FROM sessoes WHERE token_hash = $1`, [hashToken(token)]);
+}
+
+/** Termina todas as sessões de um utilizador (por exemplo, quando é removido). */
+export async function terminarSessoesDe(utilizadorId: string): Promise<void> {
+  const db = await getDb();
+  await db.query(`DELETE FROM sessoes WHERE utilizador_id = $1`, [utilizadorId]);
 }

@@ -57,6 +57,11 @@ export async function apiObter(id: string): Promise<NotaRegisto> {
   return (await pedir<{ nota: NotaRegisto }>(`/api/notas/${encodeURIComponent(id)}`)).nota;
 }
 
+/** Elimina uma nota (só administradores; a API devolve 403 aos restantes). */
+export async function apiEliminar(id: string): Promise<void> {
+  await pedir(`/api/notas/${encodeURIComponent(id)}`, { method: "DELETE" });
+}
+
 export async function apiCriar(entrada: NotaEntrada): Promise<NotaRegisto> {
   return (await pedir<{ nota: NotaRegisto }>("/api/notas", { method: "POST", body: JSON.stringify(entrada) })).nota;
 }

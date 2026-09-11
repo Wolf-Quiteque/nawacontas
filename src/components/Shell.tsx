@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { IconeFechar, IconeHistorico, IconeInstalar, IconeMais, IconeMenu, IconeSair } from "./Icones";
+import { IconeFechar, IconeHistorico, IconeInstalar, IconeMais, IconeMenu, IconeSair, IconeUtilizadores } from "./Icones";
 import { InstalarModal } from "./InstalarModal";
 import { limparRascunho } from "@/lib/armazenamento";
 import type { Utilizador } from "@/lib/auth/constantes";
@@ -19,6 +19,14 @@ const NAV = [
     ativo: (p: string) => p.startsWith("/historico") || p.startsWith("/notas/"),
   },
 ];
+
+const NAV_ADMIN = {
+  href: "/utilizadores",
+  rotulo: "Utilizadores",
+  descricao: "Aprovar e gerir acesso",
+  Icone: IconeUtilizadores,
+  ativo: (p: string) => p.startsWith("/utilizadores"),
+};
 
 export function Marca({ href = "/" }: { href?: string }) {
   return (
@@ -49,11 +57,23 @@ export function iniciais(nome: string): string {
   return `${primeira}${ultima}`.toUpperCase();
 }
 
-function Navegacao({ pathname, onNavegar }: { pathname: string; onNavegar?: () => void }) {
+function Navegacao({
+  pathname,
+  onNavegar,
+  admin,
+  pendentes,
+}: {
+  pathname: string;
+  onNavegar?: () => void;
+  admin: boolean;
+  pendentes: number;
+}) {
+  const itens = admin ? [...NAV, NAV_ADMIN] : NAV;
   return (
     <nav className="space-y-1" aria-label="Menu principal">
-      {NAV.map(({ href, rotulo, descricao, Icone, ativo }) => {
+      {itens.map(({ href, rotulo, descricao, Icone, ativo }) => {
         const estaAtivo = ativo(pathname);
+        const contador = href === NAV_ADMIN.href ? pendentes : 0;
         return (
           <Link
             key={href}
@@ -71,10 +91,20 @@ function Navegacao({ pathname, onNavegar }: { pathname: string; onNavegar?: () =
             >
               <Icone />
             </span>
-            <span className="leading-tight">
+            <span className="min-w-0 flex-1 leading-tight">
               <span className="block text-sm font-semibold">{rotulo}</span>
               <span className={`block text-[11px] ${estaAtivo ? "text-white/80" : "text-tinta-suave"}`}>{descricao}</span>
             </span>
+            {contador > 0 && (
+              <span
+                className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold tabular-nums ${
+                  estaAtivo ? "bg-white text-laranja-escuro" : "bg-amarelo text-tinta"
+                }`}
+                title={`${contador} ${contador === 1 ? "pedido de acesso pendente" : "pedidos de acesso pendentes"}`}
+              >
+                {contador}
+              </span>
+            )}
           </Link>
         );
       })}
@@ -120,7 +150,10 @@ function CartaoUtilizador({ utilizador }: { utilizador: Utilizador }) {
       </span>
       <span className="min-w-0 flex-1 leading-tight">
         <span className="block truncate text-sm font-semibold">{utilizador.nome}</span>
-        <span className="block text-[11px] tabular-nums text-tinta-suave">{formatarTelefone(utilizador.telefone)}</span>
+        <span className="block truncate text-[11px] tabular-nums text-tinta-suave">
+          {formatarTelefone(utilizador.telefone)}
+          {utilizador.admin ? " · Administrador" : ""}
+        </span>
       </span>
       <button className="botao-fantasma -mr-1 px-2" onClick={sair} disabled={aSair} aria-label="Terminar sessão" title="Sair">
         <IconeSair />
@@ -129,7 +162,16 @@ function CartaoUtilizador({ utilizador }: { utilizador: Utilizador }) {
   );
 }
 
-export function Shell({ utilizador, children }: { utilizador: Utilizador; children: React.ReactNode }) {
+export function Shell({
+  utilizador,
+  pendentes = 0,
+  children,
+}: {
+  utilizador: Utilizador;
+  /** Pedidos de acesso à espera de aprovação (só para administradores). */
+  pendentes?: number;
+  children: React.ReactNode;
+}) {
   const pathname = usePathname();
   const [menuAberto, setMenuAberto] = useState(false);
   const [instalarAberto, setInstalarAberto] = useState(false);
@@ -158,7 +200,7 @@ export function Shell({ utilizador, children }: { utilizador: Utilizador; childr
           <Marca />
         </div>
         <div className="mt-8">
-          <Navegacao pathname={pathname} />
+          <Navegacao pathname={pathname} admin={utilizador.admin} pendentes={pendentes} />
         </div>
         <div className="mt-auto space-y-2">
           <BotaoInstalar onClick={abrirInstalar} />
@@ -175,11 +217,14 @@ export function Shell({ utilizador, children }: { utilizador: Utilizador; childr
             </button>
             <Marca />
             <button
-              className="ml-auto grid h-9 w-9 place-items-center rounded-full bg-laranja text-xs font-bold text-white"
+              className="relative ml-auto grid h-9 w-9 place-items-center rounded-full bg-laranja text-xs font-bold text-white"
               onClick={() => setMenuAberto(true)}
-              aria-label={`Conta de ${utilizador.nome}`}
+              aria-label={`Conta de ${utilizador.nome}${pendentes > 0 ? ` (${pendentes} pedidos de acesso pendentes)` : ""}`}
             >
               {iniciais(utilizador.nome)}
+              {pendentes > 0 && (
+                <span className="absolute -right-0.5 -top-0.5 h-3 w-3 rounded-full border-2 border-creme bg-amarelo" aria-hidden />
+              )}
             </button>
           </div>
         </header>
@@ -199,7 +244,12 @@ export function Shell({ utilizador, children }: { utilizador: Utilizador; childr
               </button>
             </div>
             <div className="mt-6">
-              <Navegacao pathname={pathname} onNavegar={() => setMenuAberto(false)} />
+              <Navegacao
+                pathname={pathname}
+                onNavegar={() => setMenuAberto(false)}
+                admin={utilizador.admin}
+                pendentes={pendentes}
+              />
             </div>
             <div className="mt-auto space-y-2">
               <BotaoInstalar onClick={abrirInstalar} />

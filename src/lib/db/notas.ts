@@ -59,7 +59,8 @@ export async function listarNotas(f: FiltrosNotas = {}): Promise<NotaRegisto[]> 
   const limite = Math.min(Math.max(f.limite ?? 500, 1), 2000);
   const rows = await db.query<NotaRegisto>(
     `SELECT ${COLUNAS} FROM ${ORIGEM}
-     WHERE ($1::date IS NULL OR s.data >= $1::date)
+     WHERE s.eliminada_em IS NULL
+       AND ($1::date IS NULL OR s.data >= $1::date)
        AND ($2::date IS NULL OR s.data <= $2::date)
        AND ($3::text IS NULL
             OR s.beneficiario ILIKE '%' || $3 || '%'
@@ -77,7 +78,7 @@ export async function listarNotas(f: FiltrosNotas = {}): Promise<NotaRegisto[]> 
 
 export async function obterNota(id: string): Promise<NotaRegisto | null> {
   const db = await getDb();
-  const rows = await db.query<NotaRegisto>(`SELECT ${COLUNAS} FROM ${ORIGEM} WHERE s.id = $1`, [id]);
+  const rows = await db.query<NotaRegisto>(`SELECT ${COLUNAS} FROM ${ORIGEM} WHERE s.id = $1 AND s.eliminada_em IS NULL`, [id]);
   return rows[0] ? normalizar(rows[0]) : null;
 }
 
@@ -97,7 +98,7 @@ function ehConflitoDeNumero(e: unknown): boolean {
 
 /**
  * Cria uma nota atribuindo o próximo número sequencial (com repetição em caso de concorrência).
- * As notas registadas são imutáveis: não existem operações de atualização nem eliminação.
+ * As notas registadas não podem ser alteradas; só administradores as podem eliminar (ver eliminarNota).
  */
 export async function criarNota(entrada: NotaEntrada, criadoPor: string | null): Promise<NotaRegisto> {
   const db = await getDb();
@@ -132,4 +133,20 @@ export async function criarNota(entrada: NotaEntrada, criadoPor: string | null):
     }
   }
   throw new Error("Não foi possível atribuir um número à nota.");
+}
+
+/**
+ * Elimina uma nota (apenas administradores; a permissão é verificada na rota de API).
+ * A nota deixa de aparecer nas listas e o seu valor deixa de contar nos totais, mas o registo fica
+ * guardado (quem eliminou e quando) e o número não é reutilizado.
+ */
+export async function eliminarNota(id: string, eliminadaPor: string): Promise<{ numero: number; total: number } | null> {
+  const db = await getDb();
+  const rows = await db.query<{ numero: number; total: number }>(
+    `UPDATE saidas SET eliminada_em = now(), eliminada_por = $2
+      WHERE id = $1 AND eliminada_em IS NULL
+      RETURNING numero, total::float8 AS total`,
+    [id, eliminadaPor],
+  );
+  return rows[0] ? { numero: Number(rows[0].numero), total: Number(rows[0].total) || 0 } : null;
 }

@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { IconeAviso, IconeCopiar, IconeDescarregar, IconeImprimir, IconePartilhar, IconeVerificado } from "./Icones";
+import { IconeAviso, IconeCopiar, IconeDescarregar, IconeImprimir, IconeLixo, IconePartilhar, IconeVerificado } from "./Icones";
+import { apiEliminar } from "@/lib/api";
 import { NotaSvg, useLayoutNota } from "./NotaPreview";
 import { descarregarPdf, imprimirPdf, partilharPdf, suportaPartilha } from "@/lib/acoes";
 import { reutilizarNota } from "@/lib/armazenamento";
@@ -22,11 +23,12 @@ import { formatarTelefone } from "@/lib/telefone";
 type Aviso = { tipo: "ok" | "erro"; texto: string };
 
 /** Página de uma nota registada: apenas consulta e reimpressão (as notas são imutáveis). */
-export function VerNota({ nota }: { nota: NotaRegisto }) {
+export function VerNota({ nota, podeEliminar = false }: { nota: NotaRegisto; podeEliminar?: boolean }) {
   const router = useRouter();
   const dados = registoParaNota(nota);
   const primitivas = useLayoutNota(dados);
-  const [ocupado, setOcupado] = useState<null | "pdf" | "partilhar" | "imprimir">(null);
+  const [ocupado, setOcupado] = useState<null | "pdf" | "partilhar" | "imprimir" | "eliminar">(null);
+  const [confirmarEliminar, setConfirmarEliminar] = useState(false);
   const [podePartilhar, setPodePartilhar] = useState(false);
   const [aviso, setAviso] = useState<Aviso | null>(null);
   const timer = useRef<number | null>(null);
@@ -87,6 +89,20 @@ export function VerNota({ nota }: { nota: NotaRegisto }) {
     router.push("/");
   };
 
+  /** Só administradores: a nota sai do histórico e o seu valor deixa de contar nos totais. */
+  const eliminar = async () => {
+    setOcupado("eliminar");
+    try {
+      await apiEliminar(nota.id);
+      router.push("/historico");
+      router.refresh();
+    } catch (e) {
+      mostrarAviso({ tipo: "erro", texto: e instanceof Error ? e.message : "Não foi possível eliminar a nota." });
+      setOcupado(null);
+      setConfirmarEliminar(false);
+    }
+  };
+
   const total = Number(nota.total) || 0;
 
   return (
@@ -116,6 +132,16 @@ export function VerNota({ nota }: { nota: NotaRegisto }) {
               <IconeCopiar />
               Reutilizar
             </button>
+            {podeEliminar && (
+              <button
+                className="botao-secundario text-red-700 hover:border-red-200 hover:bg-red-50"
+                onClick={() => setConfirmarEliminar(true)}
+                disabled={!!ocupado}
+              >
+                <IconeLixo />
+                Eliminar
+              </button>
+            )}
           </div>
         </div>
 
@@ -177,6 +203,34 @@ export function VerNota({ nota }: { nota: NotaRegisto }) {
             <Acoes />
           </div>
         </div>
+
+        {confirmarEliminar && (
+          <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center" role="dialog" aria-modal="true" aria-labelledby="eliminar-titulo">
+            <button
+              className="absolute inset-0 bg-tinta/40 backdrop-blur-[2px]"
+              aria-label="Cancelar"
+              onClick={() => ocupado !== "eliminar" && setConfirmarEliminar(false)}
+            />
+            <div className="relative w-full rounded-t-3xl bg-white p-5 shadow-2xl sm:max-w-md sm:rounded-3xl">
+              <h2 id="eliminar-titulo" className="text-lg font-semibold">
+                Eliminar a nota N.º {nota.numero}?
+              </h2>
+              <p className="mt-1 text-sm text-tinta-suave">
+                A nota deixa de aparecer no histórico e o valor de{" "}
+                <strong className="whitespace-nowrap text-tinta">{formatarKz(total)} Kz</strong> deixa de contar nos totais. O número{" "}
+                {nota.numero} não será reutilizado.
+              </p>
+              <div className="mt-4 flex justify-end gap-2">
+                <button className="botao-secundario" onClick={() => setConfirmarEliminar(false)} disabled={ocupado === "eliminar"}>
+                  Cancelar
+                </button>
+                <button className="botao bg-red-600 text-white hover:bg-red-700" onClick={eliminar} disabled={ocupado === "eliminar"}>
+                  {ocupado === "eliminar" ? "A eliminar…" : "Eliminar nota"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {aviso && (
           <div

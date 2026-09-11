@@ -16,9 +16,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function Page({ params }: Props) {
-  await exigirUtilizador();
+  const utilizador = await exigirUtilizador();
   const { id } = await params;
   const nota = await obterNota(id);
   if (!nota) notFound();
-  return <VerNota nota={nota} />;
+  return <VerNota nota={nota} podeEliminar={utilizador.admin} />;
 }

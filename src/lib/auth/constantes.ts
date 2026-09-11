@@ -9,7 +9,22 @@ export interface Utilizador {
   id: string;
   nome: string;
   telefone: string;
+  /** Administradores aprovam contas, gerem utilizadores e podem eliminar notas. */
+  admin: boolean;
 }
+
+/** Contas novas ficam pendentes até um administrador as aprovar; só as aprovadas entram. */
+export type EstadoConta = "pendente" | "aprovado" | "removido";
+
+export interface UtilizadorGestao extends Utilizador {
+  estado: EstadoConta;
+  criadoEm: string;
+  /** Número de notas registadas (sem contar as eliminadas). */
+  notas: number;
+}
+
+export const ACOES_GESTAO = ["aprovar", "remover", "tornarAdmin", "retirarAdmin", "renomear"] as const;
+export type AcaoGestao = (typeof ACOES_GESTAO)[number];
 
 export function opcoesCookieSessao(seguro: boolean) {
   return {
