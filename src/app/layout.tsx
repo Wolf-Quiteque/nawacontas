@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { PwaRegister } from "@/components/PwaRegister";
-import { Shell } from "@/components/Shell";
 
 export const metadata: Metadata = {
   title: "NawaNotas",
@@ -28,7 +27,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="pt" className="h-full antialiased">
       <body className="min-h-full">
-        <Shell>{children}</Shell>
+        {children}
         <PwaRegister />
       </body>
     </html>

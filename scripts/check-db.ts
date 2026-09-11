@@ -1,6 +1,6 @@
 /**
  * Verifica a ligação à base de dados configurada em .env (POSTGRES_URL / DATABASE_URL).
- * Não altera dados: cria o esquema se faltar e conta as notas.
+ * Aplica o esquema tal como a app ao arrancar (tabelas em falta, reparações) e mostra contagens.
  * Executar: npm run check:db
  */
 import fs from "node:fs";
@@ -39,6 +39,8 @@ async function main() {
     "SELECT COUNT(*)::int AS n, MAX(numero) AS maximo FROM saidas",
   );
   console.log(`Notas registadas: ${n}; último número: ${maximo ?? "(nenhum)"}`);
+  const [{ u }] = await db.query<{ u: number }>("SELECT COUNT(*)::int AS u FROM utilizadores");
+  console.log(`Utilizadores: ${u}`);
 }
 
 main()

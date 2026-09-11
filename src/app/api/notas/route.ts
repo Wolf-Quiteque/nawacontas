@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { obterUtilizadorAtual, respostaNaoAutenticado } from "@/lib/auth/sessao";
 import { criarNota, listarNotas } from "@/lib/db/notas";
 import { validarEntrada } from "@/lib/validacao";
 
@@ -11,6 +12,7 @@ function erro(mensagem: string, status = 500) {
 
 export async function GET(req: Request) {
   try {
+    if (!(await obterUtilizadorAtual())) return respostaNaoAutenticado();
     const { searchParams } = new URL(req.url);
     const notas = await listarNotas({
       de: searchParams.get("de") || undefined,
@@ -32,10 +34,12 @@ export async function POST(req: Request) {
   } catch {
     return erro("Corpo do pedido inválido.", 400);
   }
-  const v = validarEntrada(body);
-  if (!v.ok) return erro(v.erro, 400);
   try {
-    const nota = await criarNota(v.valor);
+    const utilizador = await obterUtilizadorAtual();
+    if (!utilizador) return respostaNaoAutenticado();
+    const v = validarEntrada(body);
+    if (!v.ok) return erro(v.erro, 400);
+    const nota = await criarNota(v.valor, utilizador.id);
     return NextResponse.json({ nota }, { status: 201 });
   } catch (e) {
     console.error(e);

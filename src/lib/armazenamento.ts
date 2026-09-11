@@ -1,7 +1,7 @@
 import type { NotaEntrada } from "./nota";
 
 /** Rascunho da nota em edição (apenas para a nota nova), guardado no dispositivo. */
-const CHAVE_RASCUNHO = "nawanotas.rascunho.v3";
+const CHAVE_RASCUNHO = "nawanotas.rascunho.v4";
 /** Número da nota cujos dados foram copiados para a nova nota ("Reutilizar"). */
 const CHAVE_REUTILIZADA = "nawanotas.reutilizada";
 

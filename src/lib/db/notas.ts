@@ -1,31 +1,35 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
 import { getDb } from "./index";
-import { type ItemSaida, type NotaEntrada, type NotaRegisto, totalDaNota } from "../nota";
+import { normalizarItem, type NotaEntrada, type NotaRegisto, subtotalItem, totalDaNota } from "../nota";
 
 /** Última nota emitida antes da app existir; a primeira nota registada recebe NUMERO_INICIAL + 1. */
 export const NUMERO_INICIAL = Number.parseInt(process.env.NOTAS_NUMERO_INICIAL ?? "35", 10) || 35;
 
 const COLUNAS = `
-  id,
-  numero,
-  beneficiario,
-  origem,
-  periodo,
-  itens,
-  total::float8 AS "total",
-  cidade,
-  to_char(data, 'YYYY-MM-DD') AS "data",
-  to_char(criada_em AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS "criadaEm",
-  to_char(atualizada_em AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS "atualizadaEm"
+  s.id,
+  s.numero,
+  s.beneficiario,
+  s.origem,
+  s.periodo,
+  s.itens,
+  s.total::float8 AS "total",
+  s.cidade,
+  to_char(s.data, 'YYYY-MM-DD') AS "data",
+  to_char(s.criada_em AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS "criadaEm",
+  to_char(s.atualizada_em AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS "atualizadaEm",
+  u.nome AS "criadoPorNome",
+  u.telefone AS "criadoPorTelefone"
 `;
+
+const ORIGEM = `saidas s LEFT JOIN utilizadores u ON u.id = s.criado_por`;
 
 export interface FiltrosNotas {
   /** Data inicial (AAAA-MM-DD), inclusive. */
   de?: string;
   /** Data final (AAAA-MM-DD), inclusive. */
   ate?: string;
-  /** Pesquisa por beneficiário, origem, período, itens ou número. */
+  /** Pesquisa por beneficiário, origem, período, itens, autor ou número. */
   q?: string;
   limite?: number;
 }
@@ -39,14 +43,14 @@ function normalizar(r: NotaRegisto): NotaRegisto {
       itens = [];
     }
   }
-  const lista: ItemSaida[] = Array.isArray(itens)
-    ? itens.map((i) => ({
-        descricao: String((i as ItemSaida).descricao ?? ""),
-        qtd: String((i as ItemSaida).qtd ?? ""),
-        valor: Number((i as ItemSaida).valor) || 0,
-      }))
-    : [];
-  return { ...r, itens: lista, numero: Number(r.numero), total: Number(r.total) || 0 };
+  return {
+    ...r,
+    itens: Array.isArray(itens) ? itens.map(normalizarItem) : [],
+    numero: Number(r.numero),
+    total: Number(r.total) || 0,
+    criadoPorNome: r.criadoPorNome ?? null,
+    criadoPorTelefone: r.criadoPorTelefone ?? null,
+  };
 }
 
 export async function listarNotas(f: FiltrosNotas = {}): Promise<NotaRegisto[]> {
@@ -54,16 +58,17 @@ export async function listarNotas(f: FiltrosNotas = {}): Promise<NotaRegisto[]> 
   const q = f.q?.trim() || null;
   const limite = Math.min(Math.max(f.limite ?? 500, 1), 2000);
   const rows = await db.query<NotaRegisto>(
-    `SELECT ${COLUNAS} FROM saidas
-     WHERE ($1::date IS NULL OR data >= $1::date)
-       AND ($2::date IS NULL OR data <= $2::date)
+    `SELECT ${COLUNAS} FROM ${ORIGEM}
+     WHERE ($1::date IS NULL OR s.data >= $1::date)
+       AND ($2::date IS NULL OR s.data <= $2::date)
        AND ($3::text IS NULL
-            OR beneficiario ILIKE '%' || $3 || '%'
-            OR origem ILIKE '%' || $3 || '%'
-            OR periodo ILIKE '%' || $3 || '%'
-            OR itens::text ILIKE '%' || $3 || '%'
-            OR numero::text = $3)
-     ORDER BY numero DESC
+            OR s.beneficiario ILIKE '%' || $3 || '%'
+            OR s.origem ILIKE '%' || $3 || '%'
+            OR s.periodo ILIKE '%' || $3 || '%'
+            OR s.itens::text ILIKE '%' || $3 || '%'
+            OR u.nome ILIKE '%' || $3 || '%'
+            OR s.numero::text = $3)
+     ORDER BY s.numero DESC
      LIMIT ${limite}`,
     [f.de || null, f.ate || null, q],
   );
@@ -72,7 +77,7 @@ export async function listarNotas(f: FiltrosNotas = {}): Promise<NotaRegisto[]> 
 
 export async function obterNota(id: string): Promise<NotaRegisto | null> {
   const db = await getDb();
-  const rows = await db.query<NotaRegisto>(`SELECT ${COLUNAS} FROM saidas WHERE id = $1`, [id]);
+  const rows = await db.query<NotaRegisto>(`SELECT ${COLUNAS} FROM ${ORIGEM} WHERE s.id = $1`, [id]);
   return rows[0] ? normalizar(rows[0]) : null;
 }
 
@@ -90,31 +95,34 @@ function ehConflitoDeNumero(e: unknown): boolean {
   return err?.code === "23505" || /duplicate key|unique/i.test(err?.message ?? "");
 }
 
-function parametros(entrada: NotaEntrada): unknown[] {
-  return [
-    entrada.beneficiario,
-    entrada.origem,
-    entrada.periodo,
-    JSON.stringify(entrada.itens),
-    totalDaNota(entrada),
-    entrada.cidade,
-    entrada.data,
-  ];
-}
-
-/** Cria uma nota atribuindo o próximo número sequencial (com repetição em caso de concorrência). */
-export async function criarNota(entrada: NotaEntrada): Promise<NotaRegisto> {
+/**
+ * Cria uma nota atribuindo o próximo número sequencial (com repetição em caso de concorrência).
+ * As notas registadas são imutáveis: não existem operações de atualização nem eliminação.
+ */
+export async function criarNota(entrada: NotaEntrada, criadoPor: string | null): Promise<NotaRegisto> {
   const db = await getDb();
   const id = randomUUID();
+  const itens = entrada.itens.map((i) => ({ descricao: i.descricao, qtd: i.qtd, preco: i.preco, subtotal: subtotalItem(i) }));
   for (let tentativa = 0; tentativa < 5; tentativa++) {
     try {
       await db.query(
         `INSERT INTO saidas
-           (id, numero, beneficiario, origem, periodo, itens, total, cidade, data)
+           (id, numero, beneficiario, origem, periodo, itens, total, cidade, data, criado_por)
          VALUES
            ($1, (SELECT COALESCE(MAX(numero), $2::int) + 1 FROM saidas),
-            $3, $4, $5, $6::jsonb, $7::numeric, $8, $9::date)`,
-        [id, NUMERO_INICIAL, ...parametros(entrada)],
+            $3, $4, $5, $6::text::jsonb, $7::numeric, $8, $9::date, $10)`,
+        [
+          id,
+          NUMERO_INICIAL,
+          entrada.beneficiario,
+          entrada.origem,
+          entrada.periodo,
+          JSON.stringify(itens),
+          totalDaNota(entrada),
+          entrada.cidade,
+          entrada.data,
+          criadoPor,
+        ],
       );
       const nota = await obterNota(id);
       if (!nota) throw new Error("Nota criada mas não encontrada.");
@@ -125,5 +133,3 @@ export async function criarNota(entrada: NotaEntrada): Promise<NotaRegisto> {
   }
   throw new Error("Não foi possível atribuir um número à nota.");
 }
-
-// Nota: as notas registadas são imutáveis — não existem operações de atualização nem eliminação.

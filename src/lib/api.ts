@@ -26,6 +26,10 @@ async function pedir<T>(url: string, init?: RequestInit): Promise<T> {
   } catch {
     /* sem corpo */
   }
+  if (res.status === 401 && typeof window !== "undefined") {
+    // Sessão expirada: volta ao ecrã de entrada e regressa a esta página depois.
+    window.location.replace(`/entrar?voltar=${encodeURIComponent(location.pathname + location.search)}`);
+  }
   if (!res.ok) {
     const erro = (corpo as { erro?: string } | null)?.erro ?? `Erro ${res.status}`;
     throw new ErroApi(erro, res.status);

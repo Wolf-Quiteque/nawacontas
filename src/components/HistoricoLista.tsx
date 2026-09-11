@@ -122,7 +122,7 @@ export function HistoricoLista() {
             <input
               id="pesquisa"
               className="campo pl-10"
-              placeholder="Beneficiário, origem, item ou número"
+              placeholder="Beneficiário, origem, item, autor ou número"
               value={q}
               onChange={(e) => setQ(e.target.value)}
               type="search"
@@ -219,7 +219,7 @@ export function HistoricoLista() {
         ) : notas ? (
           <>
             {/* Tabela (computador) */}
-            <table className="hidden w-full text-sm md:table">
+            <table className="hidden w-full text-sm xl:table">
               <thead className="bg-creme text-left text-[11px] uppercase tracking-wide text-tinta-suave">
                 <tr>
                   <th className="px-5 py-3 font-semibold">N.º</th>
@@ -227,6 +227,7 @@ export function HistoricoLista() {
                   <th className="px-3 py-3 font-semibold">Origem</th>
                   <th className="px-3 py-3 font-semibold">Itens</th>
                   <th className="px-3 py-3 font-semibold">Data</th>
+                  <th className="px-3 py-3 font-semibold">Criada por</th>
                   <th className="px-3 py-3 text-right font-semibold">Total (Kz)</th>
                   <th className="w-24 px-3 py-3" />
                 </tr>
@@ -250,6 +251,9 @@ export function HistoricoLista() {
                       {resumoItens(n) || "—"}
                     </td>
                     <td className="px-3 py-3 tabular-nums text-tinta-suave">{dataCurta(n.data)}</td>
+                    <td className="max-w-40 truncate px-3 py-3 text-tinta-suave" title={n.criadoPorNome ?? undefined}>
+                      {n.criadoPorNome ?? "—"}
+                    </td>
                     <td className="px-3 py-3 text-right font-semibold tabular-nums">{formatarKz(Number(n.total) || 0)}</td>
                     <td className="px-3 py-3 text-right whitespace-nowrap">
                       <button
@@ -270,7 +274,7 @@ export function HistoricoLista() {
             </table>
 
             {/* Cartões (telemóvel) */}
-            <ul className="divide-y divide-linha md:hidden">
+            <ul className="divide-y divide-linha xl:hidden">
               {notas.map((n) => (
                 <li key={n.id}>
                   <Link href={`/notas/${n.id}`} className="flex items-center gap-3 px-4 py-3 transition active:bg-laranja-claro/60">
@@ -282,7 +286,10 @@ export function HistoricoLista() {
                       <span className="block truncate text-xs text-tinta-suave">
                         {[n.origem, resumoItens(n)].filter(Boolean).join(" · ") || dataPorExtenso(n.data)}
                       </span>
-                      <span className="block text-[11px] tabular-nums text-tinta-suave/80">{dataCurta(n.data)}</span>
+                      <span className="block truncate text-[11px] tabular-nums text-tinta-suave/80">
+                        {dataCurta(n.data)}
+                        {n.criadoPorNome ? ` · por ${n.criadoPorNome}` : ""}
+                      </span>
                     </span>
                     <span className="shrink-0 text-sm font-semibold tabular-nums text-laranja-escuro">{formatarKz(Number(n.total) || 0)}</span>
                     <IconeSeta className="shrink-0 text-tinta-suave/60" />

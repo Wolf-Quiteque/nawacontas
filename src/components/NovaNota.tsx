@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { IconeAviso, IconeDescarregar, IconeImprimir, IconePartilhar, IconeVerificado } from "./Icones";
-import { type Formulario, NotaForm, paraEntrada, paraFormulario } from "./NotaForm";
+import { type Formulario, NotaForm, paraEntrada, paraFormulario, quantidadeDe } from "./NotaForm";
 import { NotaSvg, useLayoutNota } from "./NotaPreview";
 import { descarregarPdf, imprimirPdf, type ModoImpressao, partilharPdf, suportaPartilha } from "@/lib/acoes";
 import { apiCriar, apiProximoNumero } from "@/lib/api";
@@ -81,9 +81,10 @@ export function NovaNota() {
   const problema = (): string | null => {
     if (!form) return "Formulário não carregado.";
     if (!form.beneficiario.trim()) return "Indique o beneficiário (quem recebe o dinheiro).";
-    const itens = form.itens.filter((i) => i.descricao.trim() || i.valor.trim());
+    const itens = form.itens.filter((i) => i.descricao.trim() || i.preco.trim());
     if (itens.length === 0) return "Adicione pelo menos um item.";
     if (itens.some((i) => !i.descricao.trim())) return "Todos os itens precisam de descrição.";
+    if (itens.some((i) => quantidadeDe(i.qtd) <= 0)) return "As quantidades têm de ser superiores a zero.";
     if (total <= 0) return "O total da saída tem de ser superior a zero.";
     return null;
   };
@@ -246,7 +247,7 @@ export function NovaNota() {
                 )}
                 <div className="flex justify-between gap-3">
                   <dt className="text-tinta-suave">Itens</dt>
-                  <dd className="text-right font-medium">{form.itens.filter((i) => i.descricao.trim() || i.valor.trim()).length}</dd>
+                  <dd className="text-right font-medium">{form.itens.filter((i) => i.descricao.trim() || i.preco.trim()).length}</dd>
                 </div>
                 <div className="flex justify-between gap-3 border-t border-linha pt-2">
                   <dt className="text-tinta-suave">Total</dt>

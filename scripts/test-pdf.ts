@@ -8,12 +8,13 @@ async function main() {
   const bytes = await gerarPdf({
     numero: "36",
     beneficiario: "Isaac Gonçalves",
-    origem: "Caixa",
+    origem: "Numerário",
     periodo: "Setembro de 2026",
     itens: [
-      { descricao: "Cabo", qtd: "", valor: 2000 },
-      { descricao: "Portagem", qtd: "3", valor: 9000 },
-      { descricao: "Combustível", qtd: "", valor: 99000 },
+      { descricao: "Cabo", qtd: 2, preco: 3000 },
+      { descricao: "Portagem", qtd: 3, preco: 3000 },
+      { descricao: "Combustível gasóleo para a viatura LD-12-34-AB (viagem Luanda–Benguela)", qtd: 2.5, preco: 400 },
+      { descricao: "Pintura viatura", qtd: 1, preco: 500000 },
     ],
     cidade: "Luanda",
     data: "2026-09-10",

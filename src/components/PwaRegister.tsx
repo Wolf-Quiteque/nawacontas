@@ -1,5 +1,6 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { IconeFechar, IconeInstalar } from "./Icones";
 import { InstalarModal } from "./InstalarModal";
@@ -10,6 +11,9 @@ const CHAVE_DISPENSADO = "nawanotas.instalacao.dispensada";
 /** Regista o service worker, capta o evento de instalação e mostra um convite discreto. */
 export function PwaRegister() {
   const { prompt, instalado } = usePwa();
+  const pathname = usePathname();
+  // Nos ecrãs de entrada o convite taparia o botão de submeter; aí existe a ligação "Instalar app".
+  const paginaConta = pathname === "/entrar" || pathname === "/registar";
   const [visivel, setVisivel] = useState(false);
   const [modal, setModal] = useState(false);
 
@@ -73,7 +77,7 @@ export function PwaRegister() {
 
   return (
     <>
-      {visivel && !instalado && (
+      {visivel && !instalado && !paginaConta && (
         <div className="no-print pointer-events-none fixed inset-x-0 bottom-0 z-40 flex justify-center px-4 pb-[calc(env(safe-area-inset-bottom)+5.25rem)] lg:pb-6">
           <div className="pointer-events-auto flex w-full max-w-md items-start gap-3 rounded-2xl border border-linha bg-white/95 p-3.5 shadow-suave backdrop-blur">
             <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-laranja-claro text-laranja-escuro">

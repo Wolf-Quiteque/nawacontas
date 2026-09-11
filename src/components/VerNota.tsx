@@ -7,7 +7,17 @@ import { IconeAviso, IconeCopiar, IconeDescarregar, IconeImprimir, IconePartilha
 import { NotaSvg, useLayoutNota } from "./NotaPreview";
 import { descarregarPdf, imprimirPdf, partilharPdf, suportaPartilha } from "@/lib/acoes";
 import { reutilizarNota } from "@/lib/armazenamento";
-import { anoDaData, dataPorExtenso, formatarKz, hojeISO, type NotaRegisto, registoParaNota } from "@/lib/nota";
+import {
+  anoDaData,
+  dataPorExtenso,
+  formatarKz,
+  formatarQtd,
+  hojeISO,
+  type NotaRegisto,
+  registoParaNota,
+  subtotalItem,
+} from "@/lib/nota";
+import { formatarTelefone } from "@/lib/telefone";
 
 type Aviso = { tipo: "ok" | "erro"; texto: string };
 
@@ -116,17 +126,27 @@ export function VerNota({ nota }: { nota: NotaRegisto }) {
                 <Linha rotulo="Beneficiário" valor={nota.beneficiario || "—"} />
                 <Linha rotulo="Origem" valor={nota.origem || "—"} />
                 <Linha rotulo="Período" valor={nota.periodo || "—"} />
+                <Linha
+                  rotulo="Registada por"
+                  valor={
+                    nota.criadoPorNome
+                      ? `${nota.criadoPorNome}${nota.criadoPorTelefone ? ` (${formatarTelefone(nota.criadoPorTelefone)})` : ""}`
+                      : "—"
+                  }
+                />
               </dl>
               <div className="mt-4 border-t border-linha pt-3">
                 <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-tinta-suave">Itens</p>
                 <ul className="space-y-1.5 text-sm">
                   {nota.itens.map((i, k) => (
                     <li key={k} className="flex items-baseline justify-between gap-3">
-                      <span className="min-w-0 truncate">
-                        {i.descricao || <span className="text-tinta-suave">Sem descrição</span>}
-                        {i.qtd && <span className="ml-1.5 text-xs text-tinta-suave">× {i.qtd}</span>}
+                      <span className="min-w-0">
+                        <span className="block truncate">{i.descricao || <span className="text-tinta-suave">Sem descrição</span>}</span>
+                        <span className="block text-xs tabular-nums text-tinta-suave">
+                          {formatarQtd(i.qtd)} × {formatarKz(i.preco)}
+                        </span>
                       </span>
-                      <span className="shrink-0 tabular-nums">{formatarKz(i.valor)}</span>
+                      <span className="shrink-0 tabular-nums">{formatarKz(subtotalItem(i))}</span>
                     </li>
                   ))}
                 </ul>

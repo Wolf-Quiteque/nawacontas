@@ -116,6 +116,14 @@ export function layoutNota(nota: NotaData, measure: Measure): Primitive[] {
   const line = (x1: number, y1: number, x2: number, y2: number, color: string, width = 0.75) =>
     p.push({ kind: "line", x1, y1, x2, y2, color, width });
 
+  /** Encurta um texto com reticências para caber em `max` (pt). */
+  const cortar = (s: string, size: number, bold: boolean, max: number): string => {
+    if (measure(s, size, bold) <= max) return s;
+    let r = s;
+    while (r.length > 1 && measure(`${r}…`, size, bold) > max) r = r.slice(0, -1);
+    return `${r.trimEnd()}…`;
+  };
+
   const paragrafo = (
     texto: string,
     yInicial: number,
@@ -156,7 +164,7 @@ export function layoutNota(nota: NotaData, measure: Measure): Primitive[] {
     const top = infoTop + i * alturaInfo;
     rect(infoX0, top, infoX1 - infoX0, alturaInfo, CORES.fundoRotulo);
     text(rotulo, 74.5, top + 16.6, 10.5, { bold: true });
-    if (valor) text(valor, 218.5, top + 16.6, 10.5);
+    if (valor) text(cortar(valor, 10.5, false, infoX2 - 218.5 - 6), 218.5, top + 16.6, 10.5);
   });
   const infoBottom = infoTop + alturaInfo * infoLinhas.length;
   for (let i = 0; i <= infoLinhas.length; i++) {
@@ -165,35 +173,41 @@ export function layoutNota(nota: NotaData, measure: Measure): Primitive[] {
   }
   for (const x of [infoX0, infoX1, infoX2]) line(x, infoTop - 0.5, x, infoBottom + 0.5, CORES.bordaInfo);
 
-  // ---- Tabela de valores ----
+  // ---- Tabela de itens: Descrição | Qtd. | Preço unit. | Total ----
   const payTop = infoBottom + 12;
-  const colX = [70.5, 314.5, 404.5, 525.5];
+  const colX = [70.5, 262.5, 314.5, 420.5, 525.5];
   const alturaCabecalho = 23;
   const alturaLinha = 24;
   const xDesc = 76;
-  const xTaxa = (colX[1] + colX[2]) / 2;
-  const xValor = 519.25;
+  const xQtd = (colX[1] + colX[2]) / 2;
+  const xPreco = colX[3] - 6.25;
+  const xTotal = colX[4] - 6.25;
+  const larguraDesc = colX[1] - xDesc - 6;
+  const larguraTabela = colX[colX.length - 1] - colX[0];
 
-  rect(colX[0], payTop, colX[3] - colX[0], alturaCabecalho, CORES.cabecalhoTabela);
+  rect(colX[0], payTop, larguraTabela, alturaCabecalho, CORES.cabecalhoTabela);
   const yCab = payTop + 15.96;
   text("Descrição", xDesc, yCab, 10.5, { bold: true, color: CORES.branco });
-  text("Qtd.", xTaxa, yCab, 10.5, { bold: true, color: CORES.branco, align: "center" });
-  text("Valor (Kz)", xValor, yCab, 10.5, { bold: true, color: CORES.branco, align: "right" });
+  text("Qtd.", xQtd, yCab, 10.5, { bold: true, color: CORES.branco, align: "center" });
+  text("Preço unit. (Kz)", xPreco, yCab, 10.5, { bold: true, color: CORES.branco, align: "right" });
+  text("Total (Kz)", xTotal, yCab, 10.5, { bold: true, color: CORES.branco, align: "right" });
 
-  const itens = t.itens.length ? t.itens : [{ descricao: "", qtd: "", valor: "" }];
-  const linhasTabela: Array<{ desc: string; taxa: string; valor: string; total?: boolean }> = [
-    ...itens.map((i) => ({ desc: i.descricao, taxa: i.qtd, valor: i.valor })),
-    { desc: "Total", taxa: "", valor: t.total, total: true },
+  const itens = t.itens.length ? t.itens : [{ descricao: "", qtd: "", preco: "", subtotal: "" }];
+  const linhasTabela: Array<{ desc: string; qtd: string; preco: string; valor: string; total?: boolean }> = [
+    ...itens.map((i) => ({ desc: i.descricao, qtd: i.qtd, preco: i.preco, valor: i.subtotal })),
+    { desc: "Total", qtd: "", preco: "", valor: t.total, total: true },
   ];
   linhasTabela.forEach((l, i) => {
     const top = payTop + alturaCabecalho + i * alturaLinha;
-    if (l.total) rect(colX[0], top, colX[3] - colX[0], alturaLinha, CORES.fundoTotal);
+    if (l.total) rect(colX[0], top, larguraTabela, alturaLinha, CORES.fundoTotal);
     const yb = top + 16.58;
-    if (l.desc) text(l.desc, xDesc, yb, 10.5, { bold: !!l.total });
-    if (l.taxa) text(l.taxa, xTaxa, yb, 10.5, { bold: !!l.total, align: "center" });
+    const bold = !!l.total;
+    if (l.desc) text(cortar(l.desc, 10.5, bold, larguraDesc), xDesc, yb, 10.5, { bold });
+    if (l.qtd) text(l.qtd, xQtd, yb, 10.5, { align: "center" });
+    if (l.preco) text(l.preco, xPreco, yb, 10.5, { align: "right" });
     if (l.valor)
-      text(l.valor, xValor, yb, 10.5, {
-        bold: !!l.total,
+      text(l.valor, xTotal, yb, 10.5, {
+        bold,
         align: "right",
         color: l.total ? CORES.totalLaranja : CORES.tinta,
       });
@@ -201,7 +215,7 @@ export function layoutNota(nota: NotaData, measure: Measure): Primitive[] {
   const payBottom = payTop + alturaCabecalho + alturaLinha * linhasTabela.length;
   const yLinhasH = [payTop, payTop + alturaCabecalho];
   for (let i = 1; i <= linhasTabela.length; i++) yLinhasH.push(payTop + alturaCabecalho + i * alturaLinha);
-  for (const yy of yLinhasH) line(colX[0] - 0.5, yy, colX[3] + 0.5, yy, CORES.bordaTabela);
+  for (const yy of yLinhasH) line(colX[0] - 0.5, yy, colX[colX.length - 1] + 0.5, yy, CORES.bordaTabela);
   for (const x of colX) line(x, payTop - 0.5, x, payBottom + 0.5, CORES.bordaTabela);
 
   // ---- Valor por extenso + declaração ----

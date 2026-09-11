@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { obterUtilizadorAtual, respostaNaoAutenticado } from "@/lib/auth/sessao";
 import { obterNota } from "@/lib/db/notas";
 
 export const dynamic = "force-dynamic";
@@ -10,6 +11,7 @@ type Ctx = { params: Promise<{ id: string }> };
 export async function GET(_req: Request, { params }: Ctx) {
   const { id } = await params;
   try {
+    if (!(await obterUtilizadorAtual())) return respostaNaoAutenticado();
     const nota = await obterNota(id);
     if (!nota) return NextResponse.json({ erro: "Nota não encontrada." }, { status: 404 });
     return NextResponse.json({ nota });

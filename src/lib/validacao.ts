@@ -6,10 +6,10 @@ function texto(v: unknown, max = 200): string {
   return typeof v === "string" ? v.trim().slice(0, max) : "";
 }
 
-function numero(v: unknown): number | null {
+function numero(v: unknown, max = 1e12): number | null {
   const n = typeof v === "string" ? Number(v.replace(",", ".")) : Number(v);
-  if (!Number.isFinite(n) || n < 0 || n > 1e12) return null;
-  return Math.round(n * 100) / 100;
+  if (!Number.isFinite(n) || n < 0 || n > max) return null;
+  return n;
 }
 
 /** Valida e normaliza o corpo recebido pela API. */
@@ -29,13 +29,16 @@ export function validarEntrada(body: unknown): Resultado {
     if (!raw || typeof raw !== "object") continue;
     const i = raw as Record<string, unknown>;
     const descricao = texto(i.descricao, 120);
-    const qtd = texto(i.qtd, 20);
-    const valor = numero(i.valor ?? 0);
-    if (valor === null) return { ok: false, erro: `Valor inválido no item "${descricao || "sem descrição"}".` };
-    if (!descricao && !valor) continue; // linha vazia
-    itens.push({ descricao, qtd, valor });
+    const nome = descricao || "sem descrição";
+    const precoBruto = numero(i.preco ?? i.valor ?? 0);
+    if (precoBruto === null) return { ok: false, erro: `Preço inválido no item "${nome}".` };
+    const preco = Math.round(precoBruto * 100) / 100;
+    if (!descricao && !preco) continue; // linha vazia
+    const qtdBruta = i.qtd === undefined || i.qtd === "" ? 1 : numero(i.qtd, 1e6);
+    if (qtdBruta === null || qtdBruta <= 0) return { ok: false, erro: `Quantidade inválida no item "${nome}".` };
+    itens.push({ descricao, qtd: Math.round(qtdBruta * 1000) / 1000, preco });
   }
-  if (itens.length === 0) return { ok: false, erro: "Adicione pelo menos um item com descrição e valor." };
+  if (itens.length === 0) return { ok: false, erro: "Adicione pelo menos um item com descrição e preço." };
   if (itens.length > MAX_ITENS) return { ok: false, erro: `Máximo de ${MAX_ITENS} itens por nota.` };
 
   return {

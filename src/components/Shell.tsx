@@ -3,8 +3,11 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { IconeFechar, IconeHistorico, IconeInstalar, IconeMais, IconeMenu } from "./Icones";
+import { IconeFechar, IconeHistorico, IconeInstalar, IconeMais, IconeMenu, IconeSair } from "./Icones";
 import { InstalarModal } from "./InstalarModal";
+import { limparRascunho } from "@/lib/armazenamento";
+import type { Utilizador } from "@/lib/auth/constantes";
+import { formatarTelefone } from "@/lib/telefone";
 
 const NAV = [
   { href: "/", rotulo: "Nova nota", descricao: "Criar e imprimir", Icone: IconeMais, ativo: (p: string) => p === "/" },
@@ -17,9 +20,9 @@ const NAV = [
   },
 ];
 
-function Marca() {
+export function Marca({ href = "/" }: { href?: string }) {
   return (
-    <Link href="/" className="flex items-center gap-2.5">
+    <Link href={href} className="flex items-center gap-2.5">
       <span className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-laranja to-amarelo shadow-suave">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" aria-hidden>
           <path d="M7 3h7l4 4v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" fill="#fff" />
@@ -37,6 +40,13 @@ function Marca() {
       </span>
     </Link>
   );
+}
+
+export function iniciais(nome: string): string {
+  const partes = nome.trim().split(/\s+/).filter(Boolean);
+  const primeira = partes[0]?.[0] ?? "?";
+  const ultima = partes.length > 1 ? partes[partes.length - 1][0] : "";
+  return `${primeira}${ultima}`.toUpperCase();
 }
 
 function Navegacao({ pathname, onNavegar }: { pathname: string; onNavegar?: () => void }) {
@@ -89,7 +99,37 @@ function BotaoInstalar({ onClick }: { onClick: () => void }) {
   );
 }
 
-export function Shell({ children }: { children: React.ReactNode }) {
+function CartaoUtilizador({ utilizador }: { utilizador: Utilizador }) {
+  const [aSair, setASair] = useState(false);
+
+  const sair = async () => {
+    setASair(true);
+    try {
+      await fetch("/api/auth/sair", { method: "POST" });
+    } catch {
+      /* mesmo sem ligação, sai localmente */
+    }
+    limparRascunho();
+    window.location.replace("/entrar");
+  };
+
+  return (
+    <div className="flex items-center gap-3 rounded-2xl border border-linha bg-white px-3 py-2.5">
+      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-laranja text-xs font-bold text-white" aria-hidden>
+        {iniciais(utilizador.nome)}
+      </span>
+      <span className="min-w-0 flex-1 leading-tight">
+        <span className="block truncate text-sm font-semibold">{utilizador.nome}</span>
+        <span className="block text-[11px] tabular-nums text-tinta-suave">{formatarTelefone(utilizador.telefone)}</span>
+      </span>
+      <button className="botao-fantasma -mr-1 px-2" onClick={sair} disabled={aSair} aria-label="Terminar sessão" title="Sair">
+        <IconeSair />
+      </button>
+    </div>
+  );
+}
+
+export function Shell({ utilizador, children }: { utilizador: Utilizador; children: React.ReactNode }) {
   const pathname = usePathname();
   const [menuAberto, setMenuAberto] = useState(false);
   const [instalarAberto, setInstalarAberto] = useState(false);
@@ -120,11 +160,9 @@ export function Shell({ children }: { children: React.ReactNode }) {
         <div className="mt-8">
           <Navegacao pathname={pathname} />
         </div>
-        <div className="mt-auto space-y-3">
+        <div className="mt-auto space-y-2">
           <BotaoInstalar onClick={abrirInstalar} />
-          <p className="px-1 text-[11px] leading-relaxed text-tinta-suave">
-            Todas as notas ficam registadas na base de dados com numeração sequencial automática.
-          </p>
+          <CartaoUtilizador utilizador={utilizador} />
         </div>
       </aside>
 
@@ -136,6 +174,13 @@ export function Shell({ children }: { children: React.ReactNode }) {
               <IconeMenu />
             </button>
             <Marca />
+            <button
+              className="ml-auto grid h-9 w-9 place-items-center rounded-full bg-laranja text-xs font-bold text-white"
+              onClick={() => setMenuAberto(true)}
+              aria-label={`Conta de ${utilizador.nome}`}
+            >
+              {iniciais(utilizador.nome)}
+            </button>
           </div>
         </header>
 
@@ -156,11 +201,9 @@ export function Shell({ children }: { children: React.ReactNode }) {
             <div className="mt-6">
               <Navegacao pathname={pathname} onNavegar={() => setMenuAberto(false)} />
             </div>
-            <div className="mt-auto space-y-3">
+            <div className="mt-auto space-y-2">
               <BotaoInstalar onClick={abrirInstalar} />
-              <p className="px-1 text-[11px] leading-relaxed text-tinta-suave">
-                Todas as notas ficam registadas na base de dados com numeração sequencial automática.
-              </p>
+              <CartaoUtilizador utilizador={utilizador} />
             </div>
           </div>
         </div>

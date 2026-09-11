@@ -2,12 +2,21 @@
 
 import { IconeLixo, IconeMais } from "./Icones";
 import { kwanzasPorExtenso } from "@/lib/extenso";
-import { formatarKz, MAX_ITENS, type NotaEntrada, ORIGENS_SUGERIDAS, totalDaNota } from "@/lib/nota";
+import {
+  formatarKz,
+  formatarQtd,
+  MAX_ITENS,
+  type NotaEntrada,
+  ORIGENS_SUGERIDAS,
+  subtotalItem,
+  totalDaNota,
+} from "@/lib/nota";
 
 export interface ItemFormulario {
   descricao: string;
   qtd: string;
-  valor: string;
+  /** Preço unitário. */
+  preco: string;
 }
 
 /** Valores do formulário (números como texto para edição livre). */
@@ -26,13 +35,18 @@ export function numeroDe(texto: string): number {
   return Number.isFinite(v) ? v : 0;
 }
 
-const itemVazio = (): ItemFormulario => ({ descricao: "", qtd: "", valor: "" });
+/** Quantidade de uma linha: vazio conta como 1. */
+export function quantidadeDe(texto: string): number {
+  return texto.trim() ? numeroDe(texto) : 1;
+}
+
+const itemVazio = (): ItemFormulario => ({ descricao: "", qtd: "1", preco: "" });
 
 export function paraFormulario(n: NotaEntrada): Formulario {
   const itens = (n.itens ?? []).map((i) => ({
     descricao: i.descricao ?? "",
-    qtd: i.qtd ?? "",
-    valor: i.valor ? String(i.valor) : "",
+    qtd: formatarQtd(Number(i.qtd) || 1),
+    preco: i.preco ? String(Math.round(i.preco * 100) / 100).replace(".", ",") : "",
   }));
   return {
     beneficiario: n.beneficiario ?? "",
@@ -49,7 +63,7 @@ export function paraEntrada(f: Formulario): NotaEntrada {
     beneficiario: f.beneficiario,
     origem: f.origem,
     periodo: f.periodo,
-    itens: f.itens.map((i) => ({ descricao: i.descricao, qtd: i.qtd, valor: numeroDe(i.valor) })),
+    itens: f.itens.map((i) => ({ descricao: i.descricao, qtd: quantidadeDe(i.qtd), preco: numeroDe(i.preco) })),
     cidade: f.cidade,
     data: f.data,
   };
@@ -84,7 +98,7 @@ export function NotaForm({ valores, onChange, cabecalho }: Props) {
     onChange({ ...valores, itens: itens.length ? itens : [itemVazio()] });
   };
 
-  const onEnterNoValor = (e: React.KeyboardEvent<HTMLInputElement>, idx: number) => {
+  const onEnterNoPreco = (e: React.KeyboardEvent<HTMLInputElement>, idx: number) => {
     if (e.key !== "Enter") return;
     e.preventDefault();
     if (idx === valores.itens.length - 1) adicionarItem();
@@ -136,7 +150,7 @@ export function NotaForm({ valores, onChange, cabecalho }: Props) {
                 className="campo"
                 value={valores.origem}
                 onChange={(e) => set("origem", e.target.value)}
-                placeholder="Ex.: Caixa, Cartão, Transferência"
+                placeholder="Ex.: Numerário, Cartão"
                 autoCapitalize="sentences"
                 list="origens"
               />
@@ -162,51 +176,76 @@ export function NotaForm({ valores, onChange, cabecalho }: Props) {
         </div>
       </Seccao>
 
-      <Seccao titulo="Itens" descricao="Lista do que sai do caixa, com o valor de cada linha em kwanzas (Kz).">
-        <div className="space-y-2">
+      <Seccao titulo="Itens" descricao="O valor de cada linha é a quantidade × o preço unitário, em kwanzas (Kz).">
+        <div className="space-y-3 sm:space-y-2">
           <div className="hidden grid-cols-[minmax(0,1fr)_4.5rem_7.5rem_2.25rem] gap-2 px-1 text-[11px] font-medium uppercase tracking-wide text-tinta-suave sm:grid">
             <span>Descrição</span>
             <span className="text-center">Qtd.</span>
-            <span className="text-right">Valor (Kz)</span>
+            <span className="text-right">Preço unit.</span>
             <span />
           </div>
-          {valores.itens.map((item, idx) => (
-            <div key={idx} className="grid grid-cols-[minmax(0,1fr)_4rem_2.25rem] gap-2 sm:grid-cols-[minmax(0,1fr)_4.5rem_7.5rem_2.25rem]">
-              <input
-                id={`item-desc-${idx}`}
-                className="campo col-span-2 sm:col-span-1"
-                value={item.descricao}
-                onChange={(e) => setItem(idx, "descricao", e.target.value)}
-                placeholder={idx === 0 ? "Ex.: Portagem" : "Descrição"}
-                aria-label={`Descrição do item ${idx + 1}`}
-              />
-              <button
-                type="button"
-                className="botao-fantasma row-start-1 col-start-3 px-2 text-tinta-suave/70 hover:text-red-600 sm:col-start-4"
-                onClick={() => removerItem(idx)}
-                aria-label={`Remover item ${idx + 1}`}
-                disabled={valores.itens.length === 1 && !item.descricao && !item.valor}
+          {valores.itens.map((item, idx) => {
+            const qtd = quantidadeDe(item.qtd);
+            const preco = numeroDe(item.preco);
+            return (
+              <div
+                key={idx}
+                className="grid grid-cols-[6rem_minmax(0,1fr)_2.25rem] gap-2 border-b border-linha/70 pb-3 last:border-0 last:pb-0 sm:grid-cols-[minmax(0,1fr)_4.5rem_7.5rem_2.25rem] sm:border-0 sm:pb-0"
               >
-                <IconeLixo />
-              </button>
-              <input
-                className="campo text-center"
-                value={item.qtd}
-                onChange={(e) => setItem(idx, "qtd", e.target.value)}
-                placeholder="Qtd."
-                aria-label={`Quantidade do item ${idx + 1}`}
-              />
-              <input
-                className="campo col-span-2 text-right tabular-nums sm:col-span-1"
-                inputMode="decimal"
-                value={item.valor}
-                onChange={(e) => setItem(idx, "valor", e.target.value)}
-                onKeyDown={(e) => onEnterNoValor(e, idx)}
-                placeholder="Valor (Kz)"
-                aria-label={`Valor do item ${idx + 1}`}
-              />
-            </div>
-          ))}
+                <input
+                  id={`item-desc-${idx}`}
+                  className="campo col-span-2 sm:col-span-1"
+                  value={item.descricao}
+                  onChange={(e) => setItem(idx, "descricao", e.target.value)}
+                  placeholder={idx === 0 ? "Ex.: Cabo" : "Descrição"}
+                  aria-label={`Descrição do item ${idx + 1}`}
+                />
+                <button
+                  type="button"
+                  className="botao-fantasma col-start-3 row-start-1 px-2 text-tinta-suave/70 hover:text-red-600 sm:col-start-4"
+                  onClick={() => removerItem(idx)}
+                  aria-label={`Remover item ${idx + 1}`}
+                  disabled={valores.itens.length === 1 && !item.descricao && !item.preco}
+                >
+                  <IconeLixo />
+                </button>
+                <div className="relative col-start-1 row-start-2 sm:col-start-2 sm:row-start-1">
+                  <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-[11px] font-medium text-tinta-suave/70 sm:hidden">
+                    Qtd.
+                  </span>
+                  <input
+                    className="campo pl-10 text-right tabular-nums sm:pl-2 sm:text-center"
+                    inputMode="decimal"
+                    value={item.qtd}
+                    onChange={(e) => setItem(idx, "qtd", e.target.value)}
+                    onFocus={(e) => e.target.select()}
+                    placeholder="1"
+                    aria-label={`Quantidade do item ${idx + 1}`}
+                  />
+                </div>
+                <div className="relative col-span-2 col-start-2 row-start-2 sm:col-span-1 sm:col-start-3 sm:row-start-1">
+                  <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-[11px] font-medium text-tinta-suave/70 sm:hidden">
+                    Preço unit.
+                  </span>
+                  <input
+                    className="campo pl-20 text-right tabular-nums sm:pl-3.5"
+                    inputMode="decimal"
+                    value={item.preco}
+                    onChange={(e) => setItem(idx, "preco", e.target.value)}
+                    onKeyDown={(e) => onEnterNoPreco(e, idx)}
+                    placeholder="0"
+                    aria-label={`Preço unitário do item ${idx + 1}`}
+                  />
+                </div>
+                {preco > 0 && (
+                  <p className="col-span-full text-right text-xs tabular-nums text-tinta-suave sm:pr-11" aria-live="polite">
+                    {formatarQtd(qtd)} × {formatarKz(preco)} ={" "}
+                    <span className="font-semibold text-tinta">{formatarKz(subtotalItem({ qtd, preco }))} Kz</span>
+                  </p>
+                )}
+              </div>
+            );
+          })}
           <div className="flex items-center justify-between gap-3 pt-1">
             <button type="button" className="botao-secundario" onClick={adicionarItem} disabled={valores.itens.length >= MAX_ITENS}>
               <IconeMais />

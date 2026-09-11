@@ -19,6 +19,23 @@ export interface Db {
 }
 
 const SCHEMA = `
+CREATE TABLE IF NOT EXISTS utilizadores (
+  id TEXT PRIMARY KEY,
+  telefone TEXT NOT NULL UNIQUE,
+  nome TEXT NOT NULL,
+  senha_hash TEXT NOT NULL,
+  falhas INTEGER NOT NULL DEFAULT 0,
+  bloqueado_ate TIMESTAMPTZ,
+  criado_em TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS sessoes (
+  token_hash TEXT PRIMARY KEY,
+  utilizador_id TEXT NOT NULL REFERENCES utilizadores(id) ON DELETE CASCADE,
+  expira_em TIMESTAMPTZ NOT NULL,
+  criada_em TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS sessoes_utilizador_idx ON sessoes (utilizador_id);
+CREATE INDEX IF NOT EXISTS sessoes_expira_idx ON sessoes (expira_em);
 CREATE TABLE IF NOT EXISTS saidas (
   id TEXT PRIMARY KEY,
   numero INTEGER NOT NULL UNIQUE,
@@ -34,7 +51,23 @@ CREATE TABLE IF NOT EXISTS saidas (
 );
 CREATE INDEX IF NOT EXISTS saidas_data_idx ON saidas (data);
 CREATE INDEX IF NOT EXISTS saidas_beneficiario_idx ON saidas (lower(beneficiario));
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+     WHERE table_schema = current_schema() AND table_name = 'saidas' AND column_name = 'criado_por'
+  ) THEN
+    ALTER TABLE saidas ADD COLUMN criado_por TEXT REFERENCES utilizadores(id);
+    CREATE INDEX saidas_criado_por_idx ON saidas (criado_por);
+  END IF;
+END $$;
 `;
+
+/**
+ * Repara listas de itens gravadas como texto JSON (o driver postgres codificava o JSON duas vezes
+ * quando o parâmetro era `$n::jsonb`). O conteúdo das notas não muda, apenas o formato.
+ */
+export const REPARAR_ITENS_SQL = `UPDATE saidas SET itens = (itens #>> '{}')::jsonb WHERE jsonb_typeof(itens) = 'string';`;
 
 /** Migra notas da versão anterior (tabela "notas") para "saidas", mantendo os números. */
 const MIGRACAO_LEGADO = `
@@ -116,6 +149,7 @@ export function getDb(): Promise<Db> {
       const db = url ? await ligarPostgres(url) : await ligarPglite();
       await db.exec(SCHEMA);
       await db.exec(MIGRACAO_LEGADO);
+      await db.exec(REPARAR_ITENS_SQL);
       return db;
     })().catch((e) => {
       global.__nawanotasDb = null;
