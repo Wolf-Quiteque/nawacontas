@@ -28,7 +28,7 @@ const MENSAGEM_IMPRESSAO: Record<ModoImpressao, string> = {
   html: "Enviada para impressão.",
 };
 
-export function NovaNota() {
+export function NovaNota({ emitidoPor }: { emitidoPor: string }) {
   const [form, setForm] = useState<Formulario | null>(null);
   const [proximo, setProximo] = useState<number | null>(null);
   const [erroProximo, setErroProximo] = useState<string | null>(null);
@@ -73,7 +73,10 @@ export function NovaNota() {
   }, [form, numeroFixo]);
 
   const numero = numeroFixo !== null ? String(numeroFixo) : proximo !== null ? String(proximo) : "";
-  const nota: NotaData = useMemo(() => ({ ...(form ? paraEntrada(form) : notaPadrao()), numero }), [form, numero]);
+  const nota: NotaData = useMemo(
+    () => ({ ...(form ? paraEntrada(form) : notaPadrao()), numero, emitidoPor }),
+    [form, numero, emitidoPor],
+  );
   const primitivas = useLayoutNota(nota);
   const total = totalDaNota(nota);
 

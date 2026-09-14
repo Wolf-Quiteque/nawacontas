@@ -18,6 +18,7 @@ async function main() {
     ],
     cidade: "Luanda",
     data: "2026-09-10",
+    emitidoPor: "Márcio Quiteque",
   });
   const out = process.argv[2] || "out-teste.pdf";
   fs.writeFileSync(out, bytes);

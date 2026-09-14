@@ -26,10 +26,15 @@ export interface NotaData {
   cidade: string;
   /** Data no formato ISO (AAAA-MM-DD). */
   data: string;
+  /** Nome de quem emite a nota (utilizador com sessão iniciada); vazio nas notas antigas. */
+  emitidoPor: string;
 }
 
-/** Dados enviados para a base de dados (o número é atribuído pelo servidor). */
-export type NotaEntrada = Omit<NotaData, "numero">;
+/**
+ * Dados enviados para a base de dados. O número é atribuído pelo servidor e o autor é
+ * determinado a partir da sessão, por isso nenhum dos dois é enviado pelo cliente.
+ */
+export type NotaEntrada = Omit<NotaData, "numero" | "emitidoPor">;
 
 /** Nota registada na base de dados. */
 export interface NotaRegisto extends NotaEntrada {
@@ -81,6 +86,7 @@ export function registoParaNota(r: NotaRegisto): NotaData {
     itens: (r.itens ?? []).map(normalizarItem),
     cidade: r.cidade,
     data: r.data,
+    emitidoPor: r.criadoPorNome ?? "",
   };
 }
 
@@ -151,7 +157,7 @@ export function totalDaNota(n: Pick<NotaData, "itens">): number {
   return arredondar((n.itens ?? []).reduce((s, i) => s + subtotalItem(i), 0));
 }
 
-export function notaPadrao(numero = ""): NotaData {
+export function notaPadrao(numero = "", emitidoPor = ""): NotaData {
   const hoje = hojeISO();
   const p = partesData(hoje)!;
   const mes = MESES[p.mes - 1];
@@ -163,6 +169,7 @@ export function notaPadrao(numero = ""): NotaData {
     itens: [{ descricao: "", qtd: 1, preco: 0 }],
     cidade: "Luanda",
     data: hoje,
+    emitidoPor,
   };
 }
 
@@ -178,6 +185,8 @@ export interface NotaTextos {
   extenso: string;
   declaracao: string;
   localData: string;
+  /** Nome de quem emite a nota, já limpo (vazio quando desconhecido). */
+  emitidoPor: string;
 }
 
 export function textosDaNota(n: NotaData): NotaTextos {
@@ -204,6 +213,7 @@ export function textosDaNota(n: NotaData): NotaTextos {
     declaracao:
       "Declaro ter recebido da NawaBus o valor total acima indicado, relativo aos itens discriminados neste documento.",
     localData: `${n.cidade.trim() || "Luanda"}, ${dataPorExtenso(n.data)}`,
+    emitidoPor: (n.emitidoPor ?? "").trim(),
   };
 }
 

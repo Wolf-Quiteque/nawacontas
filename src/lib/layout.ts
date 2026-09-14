@@ -145,6 +145,16 @@ export function layoutNota(nota: NotaData, measure: Measure): Primitive[] {
   text("NOTA DE SAÍDA DE CAIXA", 520, 77.05, 16, { bold: true, color: CORES.titulo, align: "right" });
   rect(69, 116, 457, 2, CORES.laranja);
   text(t.numeroCompleto, BORDA_DIR, 131.73, 9.5, { color: CORES.cinza, align: "right" });
+  // Quem emitiu a nota, do lado oposto ao número (sem colidir com ele).
+  if (t.emitidoPor) {
+    const rotulo = "Emitido por: ";
+    const disponivel =
+      BORDA_DIR - measure(t.numeroCompleto, 9.5, false) - 16 - MARGEM_ESQ - measure(rotulo, 9.5, false);
+    if (disponivel > 30)
+      text(`${rotulo}${cortar(t.emitidoPor, 9.5, false, disponivel)}`, MARGEM_ESQ, 131.73, 9.5, {
+        color: CORES.cinza,
+      });
+  }
 
   // ---- Introdução ----
   let y = paragrafo(t.introducao, 156.59, 10.5, 14, false);
@@ -235,7 +245,9 @@ export function layoutNota(nota: NotaData, measure: Measure): Primitive[] {
   text("Pela NawaBus", cEmpresa, y, 10.5, { bold: true, align: "center" });
   text("O Beneficiário", cTrabalhador, y, 10.5, { bold: true, align: "center" });
   y += 12.19;
-  text("Nome e assinatura", cEmpresa, y, 8.5, { color: CORES.cinzaClaro, align: "center" });
+  // Do lado da empresa, o nome de quem emitiu substitui o rótulo genérico.
+  if (t.emitidoPor) text(cortar(t.emitidoPor, 9, false, 190), cEmpresa, y, 9, { color: CORES.cinza, align: "center" });
+  else text("Nome e assinatura", cEmpresa, y, 8.5, { color: CORES.cinzaClaro, align: "center" });
   text("Nome e assinatura", cTrabalhador, y, 8.5, { color: CORES.cinzaClaro, align: "center" });
 
   // ---- Rodapé ----

@@ -178,7 +178,8 @@ async function main() {
   assert(!validarEntrada({ ...base({}), itens: [{ descricao: "Cabo", qtd: 0, preco: 3000 }] }).ok, "quantidade zero é rejeitada");
   const legado = normalizarItem({ descricao: "Portagem", qtd: "3", valor: 9000 });
   assert(legado.qtd === 3 && legado.preco === 3000 && subtotalItem(legado) === 9000, "notas antigas mantêm o total (valor era o total da linha)");
-  const t = textosDaNota({ ...base({}), numero: "36" });
+  const t = textosDaNota({ ...base({}), numero: "36", emitidoPor: "Márcio Quiteque" });
+  assert(t.emitidoPor === "Márcio Quiteque", "documento identifica quem emitiu a nota");
   assert(t.itens[0].qtd === "2" && t.itens[0].preco === "3.000,00" && t.itens[0].subtotal === "6.000,00", "documento mostra qtd, preço unitário e total da linha");
   assert(t.total === "15.000,00", "documento: total 15.000,00");
 
